@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FinançasPro — Controle Financeiro Inteligente</title>
+  <meta name="description" content="Gerencie suas finanças com inteligência. Dashboard completo, gráficos, controle de cartões e relatórios automáticos." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --emerald: #00C896;
+      --emerald-dark: #00A87E;
+      --emerald-glow: rgba(0,200,150,0.18);
+      --gold: #F5B942;
+      --gold-light: #FDD97E;
+      --navy: #0A1628;
+      --navy2: #0F1F38;
+      --navy3: #162844;
+      --slate: #1E3350;
+      --text: #E8F0FE;
+      --text-muted: #8BA3C4;
+      --border: rgba(255,255,255,0.08);
+      --radius: 16px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Sora', sans-serif;
+      background: var(--navy);
+      color: var(--text);
+      overflow-x: hidden;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 18px 5%;
+      background: rgba(10,22,40,0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-logo {
+      display: flex; align-items: center; gap: 10px;
+      font-weight: 700; font-size: 1.2rem; color: var(--text);
+      text-decoration: none;
+    }
+    .nav-logo .owl { font-size: 1.5rem; }
+    .nav-logo span { color: var(--emerald); }
+    .nav-links { display: flex; gap: 10px; align-items: center; }
+    .nav-links a {
+      padding: 9px 18px; border-radius: 50px;
+      font-size: 0.85rem; font-weight: 500; text-decoration: none;
+      transition: all .2s;
+    }
+    .nav-link-ghost { color: var(--text-muted); }
+    .nav-link-ghost:hover { color: var(--text); }
+    .nav-link-outline {
+      color: var(--emerald);
+      border: 1.5px solid var(--emerald);
+    }
+    .nav-link-outline:hover { background: var(--emerald-glow); }
+    .nav-link-fill {
+      background: var(--emerald); color: var(--navy);
+      font-weight: 700;
+    }
+    .nav-link-fill:hover { background: var(--emerald-dark); }
+
+    /* ── HERO ── */
+    .hero {
+      min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      text-align: center;
+      padding: 120px 5% 80px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-bg {
+      position: absolute; inset: 0; pointer-events: none;
+      background:
+        radial-gradient(ellipse 80% 60% at 50% -10%, rgba(0,200,150,0.12) 0%, transparent 70%),
+        radial-gradient(ellipse 40% 40% at 80% 80%, rgba(245,185,66,0.06) 0%, transparent 60%);
+    }
+    .hero-grid {
+      position: absolute; inset: 0; pointer-events: none;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+      background-size: 60px 60px;
+      mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%);
+    }
+
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(0,200,150,0.1); border: 1px solid rgba(0,200,150,0.3);
+      color: var(--emerald); border-radius: 50px;
+      padding: 6px 16px; font-size: 0.8rem; font-weight: 600;
+      margin-bottom: 28px; letter-spacing: 0.05em;
+    }
+
+    .hero h1 {
+      font-family: 'DM Serif Display', serif;
+      font-size: clamp(2.8rem, 6vw, 5rem);
+      line-height: 1.1;
+      margin-bottom: 24px;
+      position: relative;
+    }
+    .hero h1 em {
+      font-style: italic;
+      color: var(--emerald);
+    }
+
+    .hero-sub {
+      font-size: clamp(1rem, 2vw, 1.2rem);
+      color: var(--text-muted);
+      max-width: 580px;
+      line-height: 1.7;
+      margin: 0 auto 44px;
+    }
+
+    .hero-ctas {
+      display: flex; gap: 14px; flex-wrap: wrap; justify-content: center;
+      margin-bottom: 60px;
+    }
+    .btn-primary {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: var(--emerald); color: var(--navy);
+      font-weight: 700; font-size: 1rem;
+      padding: 15px 32px; border-radius: 50px;
+      text-decoration: none;
+      box-shadow: 0 0 30px rgba(0,200,150,0.35);
+      transition: all .25s;
+    }
+    .btn-primary:hover { background: var(--emerald-dark); transform: translateY(-2px); box-shadow: 0 0 40px rgba(0,200,150,0.5); }
+    .btn-secondary {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: transparent; color: var(--text);
+      font-weight: 600; font-size: 1rem;
+      padding: 15px 32px; border-radius: 50px;
+      border: 1.5px solid var(--border);
+      text-decoration: none;
+      transition: all .25s;
+    }
+    .btn-secondary:hover { border-color: rgba(255,255,255,0.25); background: rgba(255,255,255,0.04); }
+
+    .hero-stats {
+      display: flex; gap: 40px; flex-wrap: wrap; justify-content: center;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+    }
+    .hero-stat { text-align: center; }
+    .hero-stat strong { display: block; font-size: 1.6rem; font-weight: 800; color: var(--emerald); }
+    .hero-stat span { font-size: 0.82rem; color: var(--text-muted); }
+
+    /* ── FEATURES ── */
+    section { padding: 100px 5%; }
+    .section-label {
+      font-size: 0.75rem; font-weight: 700; letter-spacing: 0.12em;
+      color: var(--emerald); text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+    .section-title {
+      font-family: 'DM Serif Display', serif;
+      font-size: clamp(2rem, 4vw, 2.8rem);
+      line-height: 1.2;
+      margin-bottom: 16px;
+    }
+    .section-sub {
+      color: var(--text-muted);
+      font-size: 1rem; line-height: 1.7;
+      max-width: 560px;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+      margin-top: 60px;
+    }
+    .feature-card {
+      background: var(--navy2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px 28px;
+      transition: border-color .25s, transform .25s;
+    }
+    .feature-card:hover { border-color: rgba(0,200,150,0.3); transform: translateY(-4px); }
+    .feature-icon {
+      width: 48px; height: 48px;
+      background: var(--emerald-glow);
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.4rem;
+      margin-bottom: 20px;
+    }
+    .feature-card h3 { font-size: 1.05rem; font-weight: 600; margin-bottom: 10px; }
+    .feature-card p { color: var(--text-muted); font-size: 0.9rem; line-height: 1.6; }
+
+    /* ── DASHBOARD MOCKUP ── */
+    .mockup-section {
+      background: var(--navy2);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .mockup-inner {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 80px;
+      align-items: center;
+    }
+    @media (max-width: 768px) { .mockup-inner { grid-template-columns: 1fr; } }
+
+    .mockup-screen {
+      background: var(--navy3);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 24px;
+      box-shadow: 0 40px 80px rgba(0,0,0,0.5);
+    }
+    .mockup-topbar {
+      display: flex; align-items: center; gap: 6px;
+      margin-bottom: 20px; padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .mockup-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .mockup-cards {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+      margin-bottom: 20px;
+    }
+    .mockup-card {
+      background: var(--slate);
+      border-radius: 12px; padding: 16px;
+      border: 1px solid var(--border);
+    }
+    .mockup-card-label { font-size: 0.7rem; color: var(--text-muted); margin-bottom: 6px; }
+    .mockup-card-val { font-size: 1.2rem; font-weight: 700; }
+    .mockup-card-val.green { color: var(--emerald); }
+    .mockup-card-val.red { color: #FF6B6B; }
+    .mockup-card-val.gold { color: var(--gold); }
+
+    .mockup-bar-label { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px; }
+    .mockup-bars { display: flex; flex-direction: column; gap: 8px; }
+    .mockup-bar-row { display: flex; align-items: center; gap: 10px; }
+    .mockup-bar-name { font-size: 0.7rem; color: var(--text-muted); width: 80px; flex-shrink: 0; }
+    .mockup-bar-track {
+      flex: 1; height: 8px;
+      background: var(--slate);
+      border-radius: 50px; overflow: hidden;
+    }
+    .mockup-bar-fill { height: 100%; border-radius: 50px; background: var(--emerald); }
+
+    /* ── PLANS ── */
+    #planos { text-align: center; }
+    #planos .section-sub { margin: 0 auto; }
+
+    .plans-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+      margin-top: 60px;
+      align-items: stretch;
+    }
+    .plan-card {
+      background: var(--navy2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 36px 28px 32px;
+      display: flex; flex-direction: column;
+      transition: border-color .25s, transform .25s;
+      position: relative;
+    }
+    .plan-card:hover { transform: translateY(-6px); }
+    .plan-card.featured {
+      border-color: var(--emerald);
+      background: linear-gradient(160deg, rgba(0,200,150,0.06) 0%, var(--navy2) 60%);
+      box-shadow: 0 0 50px rgba(0,200,150,0.12);
+    }
+    .plan-badge {
+      position: absolute; top: -14px; left: 50%; transform: translateX(-50%);
+      background: var(--emerald); color: var(--navy);
+      font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em;
+      padding: 4px 14px; border-radius: 50px; text-transform: uppercase;
+    }
+    .plan-name { font-size: 0.85rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 14px; }
+    .plan-price { margin-bottom: 8px; }
+    .plan-price .currency { font-size: 1.2rem; font-weight: 600; vertical-align: top; margin-top: 8px; display: inline-block; }
+    .plan-price .amount { font-size: 3rem; font-weight: 800; line-height: 1; }
+    .plan-price .period { font-size: 0.85rem; color: var(--text-muted); }
+    .plan-desc { color: var(--text-muted); font-size: 0.88rem; margin-bottom: 28px; line-height: 1.5; }
+    .plan-features { list-style: none; flex: 1; margin-bottom: 32px; display: flex; flex-direction: column; gap: 12px; }
+    .plan-features li { display: flex; align-items: flex-start; gap: 10px; font-size: 0.9rem; line-height: 1.4; }
+    .plan-features li::before { content: "✓"; color: var(--emerald); font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+    .plan-cta {
+      display: block; text-align: center;
+      padding: 14px 24px; border-radius: 50px;
+      font-weight: 700; font-size: 0.95rem;
+      text-decoration: none; transition: all .25s;
+    }
+    .plan-cta-outline {
+      border: 1.5px solid var(--border);
+      color: var(--text);
+    }
+    .plan-cta-outline:hover { border-color: var(--emerald); color: var(--emerald); }
+    .plan-cta-fill {
+      background: var(--emerald); color: var(--navy);
+      box-shadow: 0 0 24px rgba(0,200,150,0.3);
+    }
+    .plan-cta-fill:hover { background: var(--emerald-dark); transform: translateY(-1px); }
+
+    /* ── FAQ ── */
+    .faq-list { max-width: 720px; margin: 60px auto 0; display: flex; flex-direction: column; gap: 12px; }
+    .faq-item {
+      background: var(--navy2); border: 1px solid var(--border);
+      border-radius: 12px; overflow: hidden;
+    }
+    .faq-q {
+      width: 100%; background: none; border: none; color: var(--text);
+      font-family: 'Sora', sans-serif; font-size: 0.95rem; font-weight: 600;
+      text-align: left; padding: 20px 24px;
+      display: flex; justify-content: space-between; align-items: center;
+      cursor: pointer; transition: color .2s;
+    }
+    .faq-q:hover { color: var(--emerald); }
+    .faq-q .arrow { transition: transform .25s; font-size: 0.8rem; color: var(--text-muted); }
+    .faq-item.open .faq-q .arrow { transform: rotate(180deg); }
+    .faq-a {
+      max-height: 0; overflow: hidden;
+      transition: max-height .3s ease, padding .3s ease;
+      color: var(--text-muted); font-size: 0.9rem; line-height: 1.7;
+    }
+    .faq-item.open .faq-a { max-height: 200px; padding: 0 24px 20px; }
+
+    /* ── CTA FINAL ── */
+    .final-cta {
+      text-align: center;
+      background: linear-gradient(135deg, rgba(0,200,150,0.06) 0%, var(--navy2) 100%);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .final-cta h2 {
+      font-family: 'DM Serif Display', serif;
+      font-size: clamp(2rem, 4vw, 3rem);
+      margin-bottom: 16px;
+    }
+    .final-cta p { color: var(--text-muted); max-width: 480px; margin: 0 auto 36px; line-height: 1.7; }
+
+    /* ── FOOTER ── */
+    footer {
+      padding: 40px 5%;
+      border-top: 1px solid var(--border);
+      display: flex; flex-wrap: wrap; gap: 20px;
+      align-items: center; justify-content: space-between;
+      color: var(--text-muted); font-size: 0.82rem;
+    }
+    footer a { color: var(--text-muted); text-decoration: none; }
+    footer a:hover { color: var(--emerald); }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 640px) {
+      nav { padding: 14px 4%; }
+      .nav-links a { padding: 8px 12px; font-size: 0.8rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a class="nav-logo" href="#">
+    <span class="owl">🦉</span>
+    Finanças<span>Pro</span>
+  </a>
+  <div class="nav-links">
+    <a href="#planos" class="nav-link-ghost">Planos</a>
+    <a href="#faq" class="nav-link-ghost">FAQ</a>
+    <a href="app.html" class="nav-link-outline">Já sou cliente</a>
+    <a href="https://go.hotmart.com/W105603611X" target="_blank" class="nav-link-fill">Comprar agora</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-grid"></div>
+
+  <div class="hero-badge">🦉 Finn te guia nas finanças</div>
+
+  <h1>
+    Controle total<br/>
+    das suas <em>finanças</em><br/>
+    em um só lugar
+  </h1>
+
+  <p class="hero-sub">
+    Dashboard inteligente com gráficos em tempo real, controle de cartões de crédito, categorias personalizadas e relatórios automáticos — tudo rodando no seu Google Sheets.
+  </p>
+
+  <div class="hero-ctas">
+    <a href="https://go.hotmart.com/W105603611X" target="_blank" class="btn-primary">
+      🚀 Quero começar agora
+    </a>
+    <a href="app.html" class="btn-secondary">
+      🔐 Acessar minha conta
+    </a>
+  </div>
+
+  <div class="hero-stats">
+    <div class="hero-stat">
+      <strong>17</strong>
+      <span>categorias de despesa</span>
+    </div>
+    <div class="hero-stat">
+      <strong>9</strong>
+      <span>formas de pagamento</span>
+    </div>
+    <div class="hero-stat">
+      <strong>100%</strong>
+      <span>seus dados privados</span>
+    </div>
+    <div class="hero-stat">
+      <strong>PWA</strong>
+      <span>instale como app</span>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="funcionalidades">
+  <p class="section-label">Funcionalidades</p>
+  <h2 class="section-title">Tudo que você precisa<br/>para organizar sua vida financeira</h2>
+  <p class="section-sub">Do básico ao avançado, o FinançasPro cobre cada aspecto do seu controle financeiro pessoal.</p>
+
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon">📊</div>
+      <h3>Dashboard Completo</h3>
+      <p>Cards de receita, despesa, saldo e taxa de economia. Gráficos de rosca e barras com insights automáticos dos últimos 6 meses.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">💳</div>
+      <h3>Controle de Cartões</h3>
+      <p>Múltiplos cartões com cor personalizada, controle de fatura por período de fechamento, barra de uso do limite e navegação entre faturas.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🔄</div>
+      <h3>Lançamentos Recorrentes</h3>
+      <p>Configure despesas fixas que aparecem todo mês automaticamente. Cancele em um mês específico sem perder o histórico.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📂</div>
+      <h3>17 Categorias de Despesa</h3>
+      <p>Moradia, Alimentação, Saúde, Educação, Transporte e muito mais. Relatórios detalhados por categoria com ranking dos maiores gastos.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📈</div>
+      <h3>Relatórios Automáticos</h3>
+      <p>Análise textual do mês, top 5 maiores despesas, taxa de economia com meta de 20% e comparativo por categoria.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📱</div>
+      <h3>App Instalável (PWA)</h3>
+      <p>Instale direto no celular ou computador como um app nativo. Funciona em tela cheia, sem barra de endereço, no Android, iOS e desktop.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🔒</div>
+      <h3>Login Google Seguro</h3>
+      <p>Autenticação via Google OAuth 2.0. Apenas e-mails autorizados acessam o sistema. Seus dados ficam na sua própria aba do Google Sheets.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">☁️</div>
+      <h3>Sincronização Automática</h3>
+      <p>Seus dados são salvos instantaneamente no LocalStorage e sincronizados com o Google Sheets. Acesse de qualquer dispositivo.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🦉</div>
+      <h3>Mascote Finn</h3>
+      <p>A corujinha dourada com mensagens motivacionais aparece nas trocas de aba para te manter animado com sua jornada financeira.</p>
+    </div>
+  </div>
+</section>
+
+<!-- MOCKUP DASHBOARD -->
+<section class="mockup-section">
+  <div class="mockup-inner">
+    <div>
+      <p class="section-label">Dashboard</p>
+      <h2 class="section-title">Seus números em tempo real</h2>
+      <p class="section-sub" style="margin-bottom:28px;">Veja receita total, maior gasto do mês, total em cartão de crédito e principal despesa — tudo em cards visuais atualizados automaticamente.</p>
+      <ul style="list-style:none;display:flex;flex-direction:column;gap:12px;color:var(--text-muted);font-size:0.9rem;">
+        <li>✅ Gráfico de maiores categorias de gasto</li>
+        <li>✅ Total por categoria de receita e despesa</li>
+        <li>✅ Total gasto no cartão de crédito</li>
+        <li>✅ Principal gasto no cartão</li>
+        <li>✅ Comparativo mensal — últimos 6 meses</li>
+      </ul>
+    </div>
+    <div class="mockup-screen">
+      <div class="mockup-topbar">
+        <div class="mockup-dot" style="background:#FF5F57;"></div>
+        <div class="mockup-dot" style="background:#FEBC2E;"></div>
+        <div class="mockup-dot" style="background:#28C840;"></div>
+        <span style="margin-left:10px;font-size:0.7rem;color:var(--text-muted);">financaspro.planilhaprofissional.com</span>
+      </div>
+      <div class="mockup-cards">
+        <div class="mockup-card">
+          <div class="mockup-card-label">Receita Total</div>
+          <div class="mockup-card-val green">R$ 8.450</div>
+        </div>
+        <div class="mockup-card">
+          <div class="mockup-card-label">Despesas</div>
+          <div class="mockup-card-val red">R$ 5.230</div>
+        </div>
+        <div class="mockup-card">
+          <div class="mockup-card-label">Saldo</div>
+          <div class="mockup-card-val" style="color:var(--text);">R$ 3.220</div>
+        </div>
+        <div class="mockup-card">
+          <div class="mockup-card-label">Cartão Crédito</div>
+          <div class="mockup-card-val gold">R$ 1.870</div>
+        </div>
+      </div>
+      <div class="mockup-bar-label">Maiores gastos por categoria</div>
+      <div class="mockup-bars">
+        <div class="mockup-bar-row">
+          <div class="mockup-bar-name">Moradia</div>
+          <div class="mockup-bar-track"><div class="mockup-bar-fill" style="width:78%;"></div></div>
+          <span style="font-size:0.7rem;color:var(--text-muted);">R$1.950</span>
+        </div>
+        <div class="mockup-bar-row">
+          <div class="mockup-bar-name">Alimentação</div>
+          <div class="mockup-bar-track"><div class="mockup-bar-fill" style="width:52%;background:var(--gold-light);"></div></div>
+          <span style="font-size:0.7rem;color:var(--text-muted);">R$980</span>
+        </div>
+        <div class="mockup-bar-row">
+          <div class="mockup-bar-name">Transporte</div>
+          <div class="mockup-bar-track"><div class="mockup-bar-fill" style="width:34%;background:#60A5FA;"></div></div>
+          <span style="font-size:0.7rem;color:var(--text-muted);">R$620</span>
+        </div>
+        <div class="mockup-bar-row">
+          <div class="mockup-bar-name">Saúde</div>
+          <div class="mockup-bar-track"><div class="mockup-bar-fill" style="width:24%;background:#F472B6;"></div></div>
+          <span style="font-size:0.7rem;color:var(--text-muted);">R$430</span>
+        </div>
+        <div class="mockup-bar-row">
+          <div class="mockup-bar-name">Educação</div>
+          <div class="mockup-bar-track"><div class="mockup-bar-fill" style="width:18%;background:#A78BFA;"></div></div>
+          <span style="font-size:0.7rem;color:var(--text-muted);">R$320</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PLANS -->
+<section id="planos">
+  <p class="section-label">Planos</p>
+  <h2 class="section-title">Escolha o plano ideal para você</h2>
+  <p class="section-sub">Pagamento único ou assinatura anual — comece hoje e tenha controle total das suas finanças.</p>
+
+  <div class="plans-grid">
+
+    <!-- ESSENCIAL -->
+    <div class="plan-card">
+      <div class="plan-name">Essencial</div>
+      <div class="plan-price">
+        <span class="currency">R$</span><span class="amount">97</span>
+        <span class="period"> pagamento único</span>
+      </div>
+      <p class="plan-desc">Perfeito para quem quer começar a organizar as finanças agora.</p>
+      <ul class="plan-features">
+        <li>App completo FinançasPro</li>
+        <li>Dashboard com gráficos</li>
+        <li>17 categorias de despesa</li>
+        <li>Controle de cartões de crédito</li>
+        <li>Lançamentos recorrentes</li>
+        <li>PWA — instale como app</li>
+        <li>Suporte por e-mail por 30 dias</li>
+      </ul>
+      <a href="https://go.hotmart.com/W105603611X" target="_blank" class="plan-cta plan-cta-outline">Comprar Essencial</a>
+    </div>
+
+    <!-- PROFISSIONAL (featured) -->
+    <div class="plan-card featured">
+      <div class="plan-badge">Mais popular</div>
+      <div class="plan-name">Profissional</div>
+      <div class="plan-price">
+        <span class="currency">R$</span><span class="amount">147</span>
+        <span class="period"> pagamento único</span>
+      </div>
+      <p class="plan-desc">Para quem quer o melhor suporte e atualizações por um ano inteiro.</p>
+      <ul class="plan-features">
+        <li>Tudo do plano Essencial</li>
+        <li>Atualizações por 12 meses</li>
+        <li>Suporte por e-mail por 90 dias</li>
+        <li>Suporte via WhatsApp</li>
+        <li>Atendimento prioritário</li>
+        <li>Acesso a novas funcionalidades</li>
+      </ul>
+      <a href="https://go.hotmart.com/W105603611X" target="_blank" class="plan-cta plan-cta-fill">Comprar Profissional</a>
+    </div>
+
+    <!-- PREMIUM ANUAL -->
+    <div class="plan-card">
+      <div class="plan-name">Premium Anual</div>
+      <div class="plan-price">
+        <span class="currency">R$</span><span class="amount">197</span>
+        <span class="period">/ano</span>
+      </div>
+      <p class="plan-desc">Acesso contínuo com suporte prioritário e todas as atualizações para sempre.</p>
+      <ul class="plan-features">
+        <li>Tudo do plano Profissional</li>
+        <li>Atualizações sempre incluídas</li>
+        <li>Suporte prioritário contínuo</li>
+        <li>E-mail + WhatsApp ilimitados</li>
+        <li>Acesso garantido enquanto ativo</li>
+        <li>Primeiros a receber novidades</li>
+      </ul>
+      <a href="https://go.hotmart.com/W105603611X" target="_blank" class="plan-cta plan-cta-outline">Assinar Premium</a>
+    </div>
+
+  </div>
+
+  <!-- Whatsapp note -->
+  <p style="text-align:center;margin-top:32px;color:var(--text-muted);font-size:0.85rem;">
+    📱 Suporte WhatsApp disponível nos planos Profissional e Premium: <strong style="color:var(--text);">+55 66 99238-8026</strong>
+  </p>
+</section>
+
+<!-- FAQ -->
+<section id="faq" style="background:var(--navy2);border-top:1px solid var(--border);border-bottom:1px solid var(--border);">
+  <div style="text-align:center;">
+    <p class="section-label">Dúvidas Frequentes</p>
+    <h2 class="section-title">Perguntas frequentes</h2>
+  </div>
+
+  <div class="faq-list">
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">
+        Como funciona o acesso após a compra?
+        <span class="arrow">▼</span>
+      </button>
+      <div class="faq-a">
+        Após a compra aprovada na Hotmart, seu e-mail é automaticamente cadastrado no sistema via webhook. Você receberá um e-mail com o link de acesso. Basta entrar com sua conta Google e já estará dentro do app.
+      </div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">
+        Meus dados financeiros ficam seguros?
+        <span class="arrow">▼</span>
+      </button>
+      <div class="faq-a">
+        Sim. Cada usuário tem uma aba exclusiva no Google Sheets. Nenhum outro usuário acessa seus dados. A autenticação é feita via Google OAuth 2.0, sem senhas para gerenciar.
+      </div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">
+        Preciso instalar alguma coisa?
+        <span class="arrow">▼</span>
+      </button>
+      <div class="faq-a">
+        Não. O FinançasPro roda direto no navegador. Se quiser, você pode instalá-lo como PWA no celular ou computador para ter a experiência de um app nativo, mas não é obrigatório.
+      </div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">
+        Funciona em celular?
+        <span class="arrow">▼</span>
+      </button>
+      <div class="faq-a">
+        Sim, o FinançasPro é totalmente responsivo e funciona em Android, iOS e computadores. Você pode instalar como app na tela inicial do seu celular para acesso rápido.
+      </div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">
+        Posso usar com mais de um cartão de crédito?
+        <span class="arrow">▼</span>
+      </button>
+      <div class="faq-a">
+        Sim! O FinançasPro suporta múltiplos cartões de crédito, cada um com cor personalizada, controle de fatura por período (fechamento + vencimento) e navegação entre faturas anteriores.
+      </div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">
+        Tenho direito a atualizações?
+        <span class="arrow">▼</span>
+      </button>
+      <div class="faq-a">
+        O plano Essencial não inclui atualizações automáticas. O plano Profissional inclui atualizações por 12 meses. O plano Premium Anual inclui todas as atualizações enquanto a assinatura estiver ativa.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FINAL CTA -->
+<section class="final-cta">
+  <p class="section-label">Comece hoje</p>
+  <h2>Chega de planilhas<br/>bagunçadas e contas perdidas</h2>
+  <p>O FinançasPro coloca você no controle em minutos. Acesso imediato após a compra.</p>
+  <a href="https://go.hotmart.com/W105603611X" target="_blank" class="btn-primary" style="font-size:1.1rem;padding:17px 40px;">
+    🚀 Começar por R$ 97
+  </a>
+  <p style="margin-top:20px;color:var(--text-muted);font-size:0.82rem;">Pagamento 100% seguro via Hotmart · Acesso imediato</p>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div>
+    <div style="display:flex;align-items:center;gap:8px;font-weight:700;margin-bottom:6px;">
+      🦉 Finanças<span style="color:var(--emerald);">Pro</span>
+    </div>
+    <span>© 2026 PlanilhaProfissional.com · Todos os direitos reservados</span>
+  </div>
+  <div style="display:flex;gap:20px;flex-wrap:wrap;">
+    <a href="mailto:contato@planilhaprofissional.com">Contato</a>
+    <a href="https://go.hotmart.com/W105603611X" target="_blank">Comprar</a>
+    <a href="app.html">Acessar App</a>
+  </div>
+</footer>
+
+<script>
+  function toggleFaq(btn) {
+    const item = btn.closest('.faq-item');
+    const isOpen = item.classList.contains('open');
+    document.querySelectorAll('.faq-item.open').forEach(i => i.classList.remove('open'));
+    if (!isOpen) item.classList.add('open');
+  }
+</script>
+</body>
+</html>
