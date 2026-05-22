@@ -1,4 +1,4 @@
-# 🦉 FinançasPro — Guia de Instalação Completa
+# 🦉 FinançasPro v2.0 — Guia de Instalação Completa
 
 > Versão 2.0 · Planilha Profissional · planilhaprofissional.com
 
