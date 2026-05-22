@@ -37,7 +37,7 @@ Acesse o painel DNS da Hostinger e adicione:
 
 | Tipo  | Nome        | Destino                     | TTL  |
 |-------|-------------|-----------------------------|------|
-| CNAME | financaspro | SEU_USUARIO.github.io       | 3600 |
+| CNAME | financasprov2 | anamazzali.github.io      | 3600 |
 
 ---
 
