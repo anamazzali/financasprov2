@@ -525,28 +525,43 @@ h1,h2,h3,h4,h5 { font-family: 'Sora', sans-serif; font-weight: 700; }
   background: #fff;
   border: 1px solid var(--bege-escuro);
   border-radius: var(--radius);
-  padding: 18px 18px 14px;
+  padding: 14px 14px 10px;
   box-shadow: var(--shadow-sm);
   transition: transform .2s, box-shadow .2s;
 }
 .caixinha-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
 .caixinha-header {
-  display: flex; align-items: center; gap: 12px; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 9px; margin-bottom: 10px;
 }
 .caixinha-icon {
-  width: 40px; height: 40px; border-radius: 10px;
+  width: 34px; height: 34px; border-radius: 8px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 1.2rem; flex-shrink: 0;
+  font-size: 1rem; flex-shrink: 0;
 }
-.caixinha-nome { font-weight: 700; font-size: 0.92rem; color: var(--texto-escuro); }
-.caixinha-pct  { font-size: 0.74rem; color: var(--texto-medio); }
+.caixinha-nome { font-weight: 700; font-size: 0.82rem; color: var(--texto-escuro); }
+.caixinha-pct  { font-size: 0.68rem; color: var(--texto-medio); }
 .caixinha-vals {
   display: grid; grid-template-columns: repeat(3,1fr);
-  gap: 8px; margin-bottom: 10px;
+  gap: 6px; margin-bottom: 8px;
 }
 .caixinha-vals > div {
-  background: var(--bege-claro); border-radius: 8px;
-  padding: 8px 10px; text-align: center;
+  background: var(--bege-claro); border-radius: 7px;
+  padding: 6px 8px; text-align: center;
+}
+/* Labels ALOCADO/GASTO/SOBRA menores */
+.caixinha-vals > div > span {
+  font-size: 0.60rem !important;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  display: block;
+  color: var(--texto-medio);
+  margin-bottom: 3px;
+}
+/* Valores dentro das caixinhas menores */
+.caixinha-vals > div > div {
+  font-size: 0.82rem !important;
+  font-weight: 800;
 }
 
 /* Comparativo chart container */
