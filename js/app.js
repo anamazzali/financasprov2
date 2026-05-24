@@ -753,7 +753,7 @@ function renderCaixinhas() {
             </div>
             <div style="display:flex;justify-content:space-between;font-size:0.72rem;color:var(--texto-medio);">
               <span>${pct}% utilizado</span>
-              <span style="color:${ok?'var(--verde-medio)':'var(--vermelho)';font-weight:600}">${ok?'✅ Dentro do limite':'⚠️ Acima do limite'}</span>
+              <span style="color:${ok?'var(--verde-medio)':'var(--vermelho)'};font-weight:600">${ok?'✅ Dentro do limite':'⚠️ Acima do limite'}</span>
             </div>
           </div>`;
       }).join('')}
