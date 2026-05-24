@@ -579,8 +579,30 @@ function renderRelatorio() {
 
   $('relatorioContent').innerHTML=`
     <p class="rel-section-title">📊 Resumo — ${MONTHS_FULL[state.currentMonth]}/${state.currentYear}</p>
-    <p class="rel-text">Receitas: <strong style="color:var(--verde-positivo);">${fmt(receita)}</strong> &nbsp;|&nbsp; Despesas: <strong style="color:var(--vermelho);">${fmt(despesa)}</strong> &nbsp;|&nbsp; Saldo: <strong style="color:${saldoCor};">${fmt(saldo)}</strong></p>
-    <p class="rel-text">${taxaStatus}</p>
+
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;">
+      <div style="background:#fff;border:1px solid var(--bege-escuro);border-radius:var(--radius);border-top:4px solid var(--verde-positivo);padding:16px;text-align:center;">
+        <div style="font-size:0.65rem;font-weight:800;text-transform:uppercase;letter-spacing:0.07em;color:var(--texto-medio);margin-bottom:8px;">💰 Receita Total</div>
+        <div style="font-size:1.25rem;font-weight:800;color:var(--verde-positivo);">${fmt(receita)}</div>
+        <div style="font-size:0.7rem;color:var(--texto-medio);margin-top:4px;">${MONTHS_FULL[state.currentMonth]}</div>
+      </div>
+      <div style="background:#fff;border:1px solid var(--bege-escuro);border-radius:var(--radius);border-top:4px solid var(--vermelho);padding:16px;text-align:center;">
+        <div style="font-size:0.65rem;font-weight:800;text-transform:uppercase;letter-spacing:0.07em;color:var(--texto-medio);margin-bottom:8px;">💸 Total Despesas</div>
+        <div style="font-size:1.25rem;font-weight:800;color:var(--vermelho);">${fmt(despesa)}</div>
+        <div style="font-size:0.7rem;color:var(--texto-medio);margin-top:4px;">${MONTHS_FULL[state.currentMonth]}</div>
+      </div>
+      <div style="background:#fff;border:1px solid var(--bege-escuro);border-radius:var(--radius);border-top:4px solid ${saldo>=0?'var(--verde-medio)':'var(--vermelho)'};padding:16px;text-align:center;">
+        <div style="font-size:0.65rem;font-weight:800;text-transform:uppercase;letter-spacing:0.07em;color:var(--texto-medio);margin-bottom:8px;">🏦 Saldo do Mês</div>
+        <div style="font-size:1.25rem;font-weight:800;color:${saldo>=0?'var(--verde-medio)':'var(--vermelho)'};">${fmt(saldo)}</div>
+        <div style="font-size:0.7rem;color:var(--texto-medio);margin-top:4px;">${saldo>=0?'✅ Positivo':'⚠️ Negativo'}</div>
+      </div>
+      <div style="background:#fff;border:1px solid var(--bege-escuro);border-radius:var(--radius);border-top:4px solid ${taxa>=20?'var(--dourado)':'var(--bege-escuro)'};padding:16px;text-align:center;">
+        <div style="font-size:0.65rem;font-weight:800;text-transform:uppercase;letter-spacing:0.07em;color:var(--texto-medio);margin-bottom:8px;">🎯 Taxa de Economia</div>
+        <div style="font-size:1.25rem;font-weight:800;color:${taxa>=20?'var(--dourado-escuro)':'var(--texto-escuro)'};">${taxa}%</div>
+        <div style="font-size:0.7rem;color:${taxa>=20?'var(--verde-positivo)':'var(--texto-medio)'};margin-top:4px;">${taxa>=20?'Meta atingida!':'Meta: 20%'}</div>
+      </div>
+    </div>
+
     <p class="rel-section-title">🔴 Top 5 Maiores Despesas</p>
     <ul class="rel-list">${top5.length
       ?top5.map(l=>`<li><span>${CAT_ICONS[l.categoria]||'📦'} ${escHtml(l.descricao)} <small style="color:var(--texto-medio);">(${l.categoria})</small></span><span class="rel-amount despesa">${fmt(l.valor)}</span></li>`).join('')
