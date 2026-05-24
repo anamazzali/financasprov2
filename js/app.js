@@ -605,6 +605,7 @@ function renderComparativo() {
     const taxa=rec>0?Math.round((saldo/rec)*100):0;
     rows.push({mes:`${MONTHS[m]}/${String(y).slice(2)}`,rec,desp,saldo,taxa});
   }
+    renderComparativoSummary(rows);
   el.innerHTML=`
     <div class="table-box" style="max-width:100%;">
       <h3 class="chart-title">📅 Comparativo — Últimos 12 Meses</h3>
@@ -887,6 +888,7 @@ function switchTab(tab) {
   if(tab==='dre')            renderDRE();
   if(tab==='caixinhas')      renderCaixinhas();
   if(tab==='analise-cartao') renderAnaliseCartao();
+  if(tab==='fluxo')          renderFluxo();
   closeSidebar();
   if(Math.random()<0.3) showFinn();
 }
@@ -907,3 +909,210 @@ document.addEventListener('DOMContentLoaded',()=>{
   $('modal').addEventListener('click',e=>{if(e.target===$('modal'))closeModal();});
   $('cardModal').addEventListener('click',e=>{if(e.target===$('cardModal'))closeCardModal();});
 });
+
+// ══════════════════════════════════════════════════
+// FLUXO DE CAIXA
+// ══════════════════════════════════════════════════
+function renderFluxo() {
+  const el = $('fluxoContent');
+  const ano = state.currentYear;
+
+  // Monta dados por dia do mês atual
+  const itensMes = getLancamentosMes();
+  itensMes.sort((a,b) => new Date(a.data) - new Date(b.data));
+
+  // Agrupa por data
+  const porDia = {};
+  itensMes.forEach(l => {
+    if (!porDia[l.data]) porDia[l.data] = { entradas:[], saidas:[] };
+    if (l.tipo === 'receita') porDia[l.data].entradas.push(l);
+    else porDia[l.data].saidas.push(l);
+  });
+
+  // Calcula saldo acumulado
+  let saldoAcum = 0;
+  const diasOrdenados = Object.keys(porDia).sort();
+
+  // Totais do mês
+  const totalEntradas = sumBy(itensMes, 'receita');
+  const totalSaidas   = sumBy(itensMes, 'despesa');
+  const saldoMes      = totalEntradas - totalSaidas;
+
+  // Cards de resumo do mês
+  const resumo = `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px;">
+      <div class="kpi-card kpi-receita">
+        <div class="kpi-label">Total Entradas</div>
+        <div class="kpi-val">${fmt(totalEntradas)}</div>
+        <div class="kpi-sub">${MONTHS[state.currentMonth]}/${state.currentYear}</div>
+      </div>
+      <div class="kpi-card kpi-despesa">
+        <div class="kpi-label">Total Saídas</div>
+        <div class="kpi-val">${fmt(totalSaidas)}</div>
+        <div class="kpi-sub">${MONTHS[state.currentMonth]}/${state.currentYear}</div>
+      </div>
+      <div class="kpi-card ${saldoMes >= 0 ? 'kpi-saldo' : 'kpi-despesa'}">
+        <div class="kpi-label">Saldo do Mês</div>
+        <div class="kpi-val">${fmt(saldoMes)}</div>
+        <div class="kpi-sub">${saldoMes >= 0 ? '✅ Positivo' : '⚠️ Negativo'}</div>
+      </div>
+    </div>`;
+
+  // Tabela diária
+  let tabelaRows = '';
+  if (!diasOrdenados.length) {
+    tabelaRows = `<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--texto-medio);">Nenhum lançamento neste mês</td></tr>`;
+  } else {
+    diasOrdenados.forEach(dia => {
+      const { entradas, saidas } = porDia[dia];
+      const entTotal = entradas.reduce((s,l) => s + parseFloat(l.valor||0), 0);
+      const saiTotal = saidas.reduce((s,l) => s + parseFloat(l.valor||0), 0);
+      saldoAcum += entTotal - saiTotal;
+
+      // Linha de data
+      tabelaRows += `
+        <tr style="background:var(--bege);">
+          <td colspan="5" style="font-weight:700;font-size:0.8rem;color:var(--verde-escuro);padding:8px 14px;">
+            📅 ${formatDate(dia)}
+          </td>
+        </tr>`;
+
+      // Entradas do dia
+      entradas.forEach(l => {
+        tabelaRows += `
+          <tr>
+            <td style="padding-left:24px;">${CAT_ICONS[l.categoria]||'💚'} ${escHtml(l.descricao)}</td>
+            <td style="color:var(--texto-medio);font-size:0.8rem;">${escHtml(l.categoria)}</td>
+            <td style="color:var(--verde-positivo);font-weight:700;">+${fmt(l.valor)}</td>
+            <td>—</td>
+            <td></td>
+          </tr>`;
+      });
+
+      // Saídas do dia
+      saidas.forEach(l => {
+        tabelaRows += `
+          <tr>
+            <td style="padding-left:24px;">${CAT_ICONS[l.categoria]||'📦'} ${escHtml(l.descricao)}</td>
+            <td style="color:var(--texto-medio);font-size:0.8rem;">${escHtml(l.categoria)}</td>
+            <td>—</td>
+            <td style="color:var(--vermelho);font-weight:700;">-${fmt(l.valor)}</td>
+            <td></td>
+          </tr>`;
+      });
+
+      // Subtotal do dia
+      const saldoDia = entTotal - saiTotal;
+      tabelaRows += `
+        <tr class="fluxo-total">
+          <td colspan="2" style="font-size:0.78rem;color:var(--texto-medio);">Saldo do dia</td>
+          <td style="color:var(--verde-positivo);">${entTotal > 0 ? fmt(entTotal) : '—'}</td>
+          <td style="color:var(--vermelho);">${saiTotal > 0 ? fmt(saiTotal) : '—'}</td>
+          <td class="${saldoAcum >= 0 ? 'fluxo-saldo-positivo' : 'fluxo-saldo-negativo'}">${fmt(saldoAcum)}</td>
+        </tr>`;
+    });
+  }
+
+  // Tabela anual — resumo por mês
+  let tabelaAnual = '';
+  let saldoAnualAcum = 0;
+  for (let m = 0; m < 12; m++) {
+    const it = getLancamentosMes(m, ano);
+    const ent = sumBy(it, 'receita');
+    const sai = sumBy(it, 'despesa');
+    const sal = ent - sai;
+    saldoAnualAcum += sal;
+    const isAtual = m === state.currentMonth;
+    tabelaAnual += `
+      <tr class="${isAtual ? 'comp-row-atual' : ''}">
+        <td style="font-weight:${isAtual?'700':'400'};">${MONTHS[m]}${isAtual?' ◀':''}</td>
+        <td style="color:var(--verde-positivo);font-weight:600;">${ent > 0 ? fmt(ent) : '—'}</td>
+        <td style="color:var(--vermelho);font-weight:600;">${sai > 0 ? fmt(sai) : '—'}</td>
+        <td class="${sal >= 0 ? 'fluxo-saldo-positivo' : 'fluxo-saldo-negativo'}">${fmt(sal)}</td>
+        <td class="${saldoAnualAcum >= 0 ? 'fluxo-saldo-positivo' : 'fluxo-saldo-negativo'}">${fmt(saldoAnualAcum)}</td>
+      </tr>`;
+  }
+
+  el.innerHTML = `
+    ${resumo}
+
+    <div class="table-box" style="margin-bottom:20px;">
+      <h3 class="chart-title">📊 Movimentação Diária — ${MONTHS[state.currentMonth]}/${state.currentYear}</h3>
+      <div style="overflow-x:auto;">
+        <table class="fluxo-table">
+          <thead>
+            <tr>
+              <th>Descrição</th>
+              <th>Categoria</th>
+              <th>Entrada</th>
+              <th>Saída</th>
+              <th>Saldo Acumulado</th>
+            </tr>
+          </thead>
+          <tbody>${tabelaRows}</tbody>
+          <tfoot>
+            <tr class="fluxo-total">
+              <td colspan="2"><strong>TOTAL DO MÊS</strong></td>
+              <td class="fluxo-saldo-positivo">${fmt(totalEntradas)}</td>
+              <td class="fluxo-saldo-negativo">${fmt(totalSaidas)}</td>
+              <td class="${saldoMes >= 0 ? 'fluxo-saldo-positivo' : 'fluxo-saldo-negativo'}">${fmt(saldoMes)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <div class="table-box">
+      <h3 class="chart-title">📅 Fluxo Anual — ${ano}</h3>
+      <div style="overflow-x:auto;">
+        <table class="fluxo-table">
+          <thead>
+            <tr>
+              <th>Mês</th>
+              <th>Entradas</th>
+              <th>Saídas</th>
+              <th>Saldo Mês</th>
+              <th>Saldo Acumulado</th>
+            </tr>
+          </thead>
+          <tbody>${tabelaAnual}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+// ══════════════════════════════════════════════════
+// COMPARATIVO MELHORADO — com cards de análise
+// ══════════════════════════════════════════════════
+function renderComparativoSummary(rows) {
+  const comReceita = rows.filter(r => r.rec > 0);
+  const melhorMes  = [...rows].sort((a,b) => b.saldo - a.saldo)[0];
+  const piorMes    = [...rows].filter(r => r.rec > 0 || r.desp > 0).sort((a,b) => a.saldo - b.saldo)[0];
+  const mediaRec   = comReceita.length ? comReceita.reduce((s,r) => s+r.rec,0) / comReceita.length : 0;
+  const mediaDesp  = comReceita.length ? comReceita.reduce((s,r) => s+r.desp,0) / comReceita.length : 0;
+  const totalEco   = rows.reduce((s,r) => s + Math.max(0, r.saldo), 0);
+
+  const el = $('compSummary');
+  if (!el) return;
+  el.innerHTML = `
+    <div class="comp-summary-card">
+      <div class="comp-summary-label">Média Receita/mês</div>
+      <div class="comp-summary-val" style="color:var(--verde-positivo);">${fmt(mediaRec)}</div>
+      <div class="comp-summary-sub">últimos 12 meses</div>
+    </div>
+    <div class="comp-summary-card">
+      <div class="comp-summary-label">Média Despesa/mês</div>
+      <div class="comp-summary-val" style="color:var(--vermelho);">${fmt(mediaDesp)}</div>
+      <div class="comp-summary-sub">últimos 12 meses</div>
+    </div>
+    <div class="comp-summary-card">
+      <div class="comp-summary-label">Melhor Mês</div>
+      <div class="comp-summary-val" style="color:var(--verde-medio);">${melhorMes ? melhorMes.mes : '—'}</div>
+      <div class="comp-summary-sub">${melhorMes ? fmt(melhorMes.saldo) + ' de saldo' : ''}</div>
+    </div>
+    <div class="comp-summary-card">
+      <div class="comp-summary-label">Total Economizado</div>
+      <div class="comp-summary-val" style="color:var(--dourado-escuro);">${fmt(totalEco)}</div>
+      <div class="comp-summary-sub">soma dos saldos positivos</div>
+    </div>`;
+}
