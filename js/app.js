@@ -102,6 +102,26 @@ const FINN_MSGS = [
   'Organizando hoje para colher amanhã. 🌟',
   'Boa decisão financeira é prática, não sorte. 💡',
   'Seu dinheiro trabalha para você quando você o controla. 💎',
+  'Quem controla o dinheiro, controla o destino. 🧭',
+  'Um orçamento não é sobre limitação — é sobre intenção. 🎯',
+  'A riqueza começa com consciência. Você já tem isso! ✨',
+  'Cada categoria organizada é uma vitória. 📂',
+  'Finanças saudáveis = vida com menos estresse. 🧘',
+  'O segredo dos ricos? Saber para onde vai cada real. 🔑',
+  'Você não precisa ganhar mais — precisa gerir melhor. ⚡',
+  'Reserva de emergência: a melhor compra que você pode fazer. 🛡️',
+  'Doação é investimento em abundância. Continue contribuindo! ❤️',
+  'Educação financeira vale mais que qualquer curso. 📚',
+  'Seu futuro agradece cada real que você economiza hoje. 🌅',
+  'Disciplina financeira hoje = liberdade financeira amanhã. 🔓',
+  'Pequenos ajustes no orçamento geram grandes mudanças no ano. 📅',
+  'Cartão de crédito é ferramenta — use com consciência! 💳',
+  'Você está investindo no seu futuro — isso é poderoso! 💹',
+  'Consistência supera intensidade nas finanças. Continue! 🏆',
+  'Cada despesa registrada é um insight sobre você mesmo. 💡',
+  'O FinançasPro te mostra o caminho — você escolhe percorrê-lo. 🗺️',
+  'Finanças não são sobre perfeição, são sobre progresso. 📈',
+  'Você começou. Isso já é mais que a maioria faz. Parabéns! 🦉',
 ];
 
 // ══════════════════════════════════════════════════
@@ -899,11 +919,88 @@ const TAB_TITLES = {
   dre:'DRE — Resultado', caixinhas:'Método das Caixinhas', 'analise-cartao':'Análise por Cartão',
 };
 
+// ══════════════════════════════════════════════════
+// CONFIGURAÇÕES
+// ══════════════════════════════════════════════════
+function getConfig() {
+  try { return JSON.parse(localStorage.getItem('fp_config')||'{}'); } catch(e) { return {}; }
+}
+function saveConfig(cfg) {
+  localStorage.setItem('fp_config', JSON.stringify(cfg));
+}
+function salvarConfig() {
+  const cfg = getConfig();
+  cfg.finnAtivo = $('toggleFinn')?.checked !== false;
+  saveConfig(cfg);
+}
+function renderConfiguracoes() {
+  if ($('configEmail')) $('configEmail').textContent = state.user?.email || '—';
+  if ($('configNome'))  $('configNome').textContent  = state.user?.name  || '—';
+  if ($('configTotalLanc'))    $('configTotalLanc').textContent    = state.lancamentos.length;
+  if ($('configTotalCartoes')) $('configTotalCartoes').textContent = state.cartoes.length;
+  const cfg = getConfig();
+  const toggle = $('toggleFinn');
+  if (toggle) toggle.checked = cfg.finnAtivo !== false;
+}
+function exportarDados() {
+  const data = { lancamentos: state.lancamentos, cartoes: state.cartoes, exportadoEm: new Date().toISOString() };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `financaspro_backup_${new Date().toISOString().split('T')[0]}.json`;
+  a.click();
+}
+function limparDados() {
+  if (!confirm('⚠️ Isso apagará todos os dados locais. Os dados no Google Sheets não serão afetados. Continuar?')) return;
+  localStorage.removeItem('fp_lancamentos');
+  localStorage.removeItem('fp_cartoes');
+  state.lancamentos = []; state.cartoes = [];
+  renderAll();
+  alert('Dados locais limpos! Recarregue a página para sincronizar com o Sheets.');
+}
+
+// ══════════════════════════════════════════════════
+// TRANSIÇÃO FINN — tela verde centralizada
+// ══════════════════════════════════════════════════
+function showFinnTransition(callback) {
+  const cfg = getConfig();
+  if (cfg.finnAtivo === false) { if(callback) callback(); return; }
+
+  const msg = FINN_MSGS[Math.floor(Math.random() * FINN_MSGS.length)];
+  const el = $('finnTransition');
+  const msgEl = $('finnTransitionMsg');
+  if (!el || !msgEl) { if(callback) callback(); return; }
+
+  msgEl.textContent = msg;
+  el.style.display = 'flex';
+  el.classList.add('finn-transition-in');
+
+  setTimeout(() => {
+    el.classList.add('finn-transition-out');
+    setTimeout(() => {
+      el.style.display = 'none';
+      el.classList.remove('finn-transition-in','finn-transition-out');
+      if (callback) callback();
+    }, 400);
+  }, 2200);
+}
+
 function switchTab(tab) {
-  $('topbarTitle').textContent=TAB_TITLES[tab]||tab;
+  const cfg = getConfig();
+  if (cfg.finnAtivo && tab !== 'dashboard') {
+    showFinnTransition(() => _doSwitchTab(tab));
+  } else {
+    _doSwitchTab(tab);
+  }
+  closeSidebar();
+}
+
+function _doSwitchTab(tab) {
+  $('topbarTitle').textContent = TAB_TITLES[tab]||tab;
   document.querySelectorAll('.tab-content').forEach(el=>el.style.display='none');
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
-  $(`tab-${tab}`).style.display='block';
+  const tabEl = $(`tab-${tab}`);
+  if (tabEl) tabEl.style.display='block';
   document.querySelector(`[data-tab="${tab}"]`)?.classList.add('active');
   if(tab==='relatorios')     renderRelatorio();
   if(tab==='comparativo')    renderComparativo();
@@ -911,8 +1008,7 @@ function switchTab(tab) {
   if(tab==='caixinhas')      renderCaixinhas();
   if(tab==='analise-cartao') renderAnaliseCartao();
   if(tab==='fluxo')          renderFluxo();
-  closeSidebar();
-  if(Math.random()<0.3) showFinn();
+  if(tab==='configuracoes')  renderConfiguracoes();
 }
 
 function toggleSidebar(){$('sidebar').classList.toggle('open');$('sidebarOverlay').classList.toggle('open');}
