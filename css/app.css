@@ -30,12 +30,17 @@
   --shadow-lg: 0 20px 48px rgba(27,67,50,0.18);
 }
 
+/* ══ FONTE GLOBAL ══ */
+html { font-size: 16px; }
 body {
   font-family: 'Sora', sans-serif;
   background: var(--bege-claro);
   color: var(--texto-escuro);
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
 }
+input, select, textarea, button { font-family: 'Sora', sans-serif; }
+h1,h2,h3,h4,h5 { font-family: 'Sora', sans-serif; font-weight: 700; }
 
 /* ══════════════════════════════════════════════════
    LOGIN — estilo ManicurePro
@@ -550,3 +555,51 @@ body {
 @media(max-width:768px) {
   .caixinhas-grid { grid-template-columns: 1fr; }
 }
+
+/* ══════════════════════════════════════════════════
+   FLUXO DE CAIXA + MELHORIAS COMPARATIVO
+══════════════════════════════════════════════════ */
+
+/* Fluxo de Caixa */
+.fluxo-table { width:100%; border-collapse: collapse; font-size: 0.85rem; }
+.fluxo-table th {
+  padding: 10px 14px; text-align: left;
+  font-size: 0.72rem; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--texto-medio);
+  background: var(--bege);
+  border-bottom: 2px solid var(--bege-escuro);
+}
+.fluxo-table td {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--bege);
+  font-size: 0.84rem;
+}
+.fluxo-table tr:hover td { background: var(--bege-claro); }
+.fluxo-table tr.fluxo-total td {
+  font-weight: 800; font-size: 0.92rem;
+  background: var(--bege);
+  border-top: 2px solid var(--bege-escuro);
+}
+.fluxo-saldo-positivo { color: var(--verde-positivo); font-weight: 800; }
+.fluxo-saldo-negativo { color: var(--vermelho); font-weight: 800; }
+
+/* Comparativo — linha de destaque */
+.comp-row-best td  { background: rgba(27,122,62,0.05); }
+.comp-row-worst td { background: rgba(192,57,43,0.04); }
+.comp-row-atual td { background: rgba(212,175,55,0.07); font-weight: 700; }
+
+/* Cards de resumo no comparativo */
+.comp-summary {
+  display: grid; grid-template-columns: repeat(4,1fr);
+  gap: 14px; margin-bottom: 20px;
+}
+@media(max-width:900px) { .comp-summary { grid-template-columns: repeat(2,1fr); } }
+.comp-summary-card {
+  background: #fff; border: 1px solid var(--bege-escuro);
+  border-radius: var(--radius); padding: 16px;
+  text-align: center; box-shadow: var(--shadow-sm);
+}
+.comp-summary-label { font-size: 0.70rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--texto-medio); margin-bottom: 6px; }
+.comp-summary-val   { font-size: 1.15rem; font-weight: 800; color: var(--texto-escuro); }
+.comp-summary-sub   { font-size: 0.72rem; color: var(--texto-medio); margin-top: 3px; }
