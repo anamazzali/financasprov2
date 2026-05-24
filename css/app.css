@@ -542,26 +542,31 @@ h1,h2,h3,h4,h5 { font-family: 'Sora', sans-serif; font-weight: 700; }
 .caixinha-pct  { font-size: 0.68rem; color: var(--texto-medio); }
 .caixinha-vals {
   display: grid; grid-template-columns: repeat(3,1fr);
-  gap: 6px; margin-bottom: 8px;
+  gap: 5px; margin-bottom: 8px;
 }
 .caixinha-vals > div {
   background: var(--bege-claro); border-radius: 7px;
-  padding: 6px 8px; text-align: center;
+  padding: 5px 4px; text-align: center;
+  min-width: 0; overflow: hidden;
 }
-/* Labels ALOCADO/GASTO/SOBRA menores */
+/* Labels ALOCADO/GASTO/SOBRA */
 .caixinha-vals > div > span {
-  font-size: 0.60rem !important;
+  font-size: 0.58rem !important;
   font-weight: 800;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   display: block;
   color: var(--texto-medio);
   margin-bottom: 3px;
+  white-space: nowrap;
 }
-/* Valores dentro das caixinhas menores */
+/* Valores dentro das caixinhas */
 .caixinha-vals > div > div {
-  font-size: 0.82rem !important;
+  font-size: 0.75rem !important;
   font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Comparativo chart container */
@@ -846,4 +851,50 @@ h1,h2,h3,h4,h5 { font-family: 'Sora', sans-serif; font-weight: 700; }
   border-top: 1px solid var(--bege-escuro);
   font-size: 0.8rem; color: var(--texto-medio);
   line-height: 1.65; text-align: center;
+}
+
+/* ══════════════════════════════════════════════════
+   MODAL CARTÃO — seleção visual de banco
+══════════════════════════════════════════════════ */
+.banco-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.banco-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  padding: 10px 6px; border-radius: 10px;
+  border: 2px solid var(--bege-escuro);
+  background: var(--bege-claro); cursor: pointer;
+  transition: all .18s; font-family: 'Sora', sans-serif;
+}
+.banco-btn:hover { border-color: var(--verde-medio); transform: translateY(-2px); }
+.banco-btn.selected {
+  border-color: var(--verde-medio);
+  background: rgba(45,106,79,0.06);
+  box-shadow: 0 0 0 3px rgba(45,106,79,0.15);
+}
+.banco-btn-cor {
+  width: 28px; height: 28px; border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+.banco-btn-label {
+  font-size: 0.65rem; font-weight: 700;
+  color: var(--texto-escuro); text-align: center;
+  line-height: 1.2;
+}
+
+/* Preview do cartão */
+.card-preview {
+  width: 100%; border-radius: 12px; padding: 14px 18px;
+  background: linear-gradient(135deg, #2D6A4F, #1B4332);
+  color: #fff; transition: background .3s;
+  min-height: 64px; display: flex; flex-direction: column;
+  justify-content: center;
+}
+.card-preview > div:first-child {
+  font-size: 0.95rem; font-weight: 800; margin-bottom: 3px;
+}
+.card-preview > div:last-child {
+  font-size: 0.75rem; opacity: 0.75;
 }
