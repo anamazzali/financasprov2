@@ -981,124 +981,6 @@ function renderAnaliseCartao() {
 }
 
 // ══════════════════════════════════════════════════
-// TABS
-// ══════════════════════════════════════════════════
-const TAB_TITLES = {
-  dashboard:'Dashboard', lancamentos:'Lançamentos', cartoes:'Cartões de Crédito',
-  relatorios:'Relatório Mensal', comparativo:'Comparativo Mensal',
-  dre:'DRE — Resultado', caixinhas:'Método das Caixinhas', 'analise-cartao':'Análise por Cartão',
-};
-
-// ══════════════════════════════════════════════════
-// CONFIGURAÇÕES
-// ══════════════════════════════════════════════════
-function getConfig() {
-  try { return JSON.parse(localStorage.getItem('fp_config')||'{}'); } catch(e) { return {}; }
-}
-function saveConfig(cfg) {
-  localStorage.setItem('fp_config', JSON.stringify(cfg));
-}
-function salvarConfig() {
-  const cfg = getConfig();
-  cfg.finnAtivo = $('toggleFinn')?.checked !== false;
-  saveConfig(cfg);
-}
-function renderConfiguracoes() {
-  if ($('configEmail')) $('configEmail').textContent = state.user?.email || '—';
-  if ($('configNome'))  $('configNome').textContent  = state.user?.name  || '—';
-  if ($('configTotalLanc'))    $('configTotalLanc').textContent    = state.lancamentos.length;
-  if ($('configTotalCartoes')) $('configTotalCartoes').textContent = state.cartoes.length;
-  const cfg = getConfig();
-  const toggle = $('toggleFinn');
-  if (toggle) toggle.checked = cfg.finnAtivo !== false;
-}
-function exportarDados() {
-  const data = { lancamentos: state.lancamentos, cartoes: state.cartoes, exportadoEm: new Date().toISOString() };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `financaspro_backup_${new Date().toISOString().split('T')[0]}.json`;
-  a.click();
-}
-function limparDados() {
-  if (!confirm('⚠️ Isso apagará todos os dados locais. Os dados no Google Sheets não serão afetados. Continuar?')) return;
-  localStorage.removeItem('fp_lancamentos');
-  localStorage.removeItem('fp_cartoes');
-  state.lancamentos = []; state.cartoes = [];
-  renderAll();
-  alert('Dados locais limpos! Recarregue a página para sincronizar com o Sheets.');
-}
-
-// ══════════════════════════════════════════════════
-// TRANSIÇÃO FINN — tela verde centralizada
-// ══════════════════════════════════════════════════
-function showFinnTransition(callback) {
-  const cfg = getConfig();
-  if (cfg.finnAtivo === false) { if(callback) callback(); return; }
-
-  const msg = FINN_MSGS[Math.floor(Math.random() * FINN_MSGS.length)];
-  const el = $('finnTransition');
-  const msgEl = $('finnTransitionMsg');
-  if (!el || !msgEl) { if(callback) callback(); return; }
-
-  msgEl.textContent = msg;
-  el.style.display = 'flex';
-  el.classList.add('finn-transition-in');
-
-  setTimeout(() => {
-    el.classList.add('finn-transition-out');
-    setTimeout(() => {
-      el.style.display = 'none';
-      el.classList.remove('finn-transition-in','finn-transition-out');
-      if (callback) callback();
-    }, 400);
-  }, 2200);
-}
-
-function switchTab(tab) {
-  const cfg = getConfig();
-  if (cfg.finnAtivo && tab !== 'dashboard') {
-    showFinnTransition(() => _doSwitchTab(tab));
-  } else {
-    _doSwitchTab(tab);
-  }
-  closeSidebar();
-}
-
-function _doSwitchTab(tab) {
-  $('topbarTitle').textContent = TAB_TITLES[tab]||tab;
-  document.querySelectorAll('.tab-content').forEach(el=>el.style.display='none');
-  document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
-  const tabEl = $(`tab-${tab}`);
-  if (tabEl) tabEl.style.display='block';
-  document.querySelector(`[data-tab="${tab}"]`)?.classList.add('active');
-  if(tab==='relatorios')     renderRelatorio();
-  if(tab==='comparativo')    renderComparativo();
-  if(tab==='dre')            renderDRE();
-  if(tab==='caixinhas')      renderCaixinhas();
-  if(tab==='analise-cartao') renderAnaliseCartao();
-  if(tab==='fluxo')          renderFluxo();
-  if(tab==='configuracoes')  renderConfiguracoes();
-}
-
-function toggleSidebar(){$('sidebar').classList.toggle('open');$('sidebarOverlay').classList.toggle('open');}
-function closeSidebar(){$('sidebar').classList.remove('open');$('sidebarOverlay').classList.remove('open');}
-
-function showFinn(){
-  $('finnMsg').textContent=FINN_MSGS[Math.floor(Math.random()*FINN_MSGS.length)];
-  $('finn').style.display='flex';
-  setTimeout(closeFinn,3200);
-}
-function closeFinn(){const el=$('finn');if(el)el.style.display='none';}
-
-document.addEventListener('DOMContentLoaded',()=>{
-  const today=new Date().toISOString().split('T')[0];
-  const fData=$('fData');if(fData)fData.value=today;
-  $('modal').addEventListener('click',e=>{if(e.target===$('modal'))closeModal();});
-  $('cardModal').addEventListener('click',e=>{if(e.target===$('cardModal'))closeCardModal();});
-});
-
-// ══════════════════════════════════════════════════
 // FLUXO DE CAIXA
 // ══════════════════════════════════════════════════
 function renderFluxo() {
@@ -1304,3 +1186,142 @@ function renderComparativoSummary(rows) {
       <div class="comp-summary-sub">soma dos saldos positivos</div>
     </div>`;
 }
+
+// ══════════════════════════════════════════════════
+// TABS
+// ══════════════════════════════════════════════════
+const TAB_TITLES = {
+  dashboard:'Dashboard', lancamentos:'Lançamentos', cartoes:'Cartões de Crédito',
+  relatorios:'Relatório Mensal', comparativo:'Comparativo Mensal',
+  dre:'DRE — Resultado', caixinhas:'Método das Caixinhas',
+  'analise-cartao':'Análise por Cartão', fluxo:'Fluxo de Caixa',
+  'sobre-caixinhas':'As 6 Caixinhas Explicadas',
+  comece:'Comece Aqui 🚀', configuracoes:'Configurações',
+  termos:'Termos de Uso e Privacidade',
+};
+
+// ══════════════════════════════════════════════════
+// CONFIGURAÇÕES
+// ══════════════════════════════════════════════════
+function getConfig() {
+  try { return JSON.parse(localStorage.getItem('fp_config')||'{}'); } catch(e) { return {}; }
+}
+function saveConfig(cfg) { localStorage.setItem('fp_config', JSON.stringify(cfg)); }
+function salvarConfig() {
+  const cfg = getConfig();
+  cfg.finnAtivo = $('toggleFinn') ? $('toggleFinn').checked : true;
+  saveConfig(cfg);
+}
+function renderConfiguracoes() {
+  if ($('configEmail')) $('configEmail').textContent = state.user?.email || '—';
+  if ($('configNome'))  $('configNome').textContent  = state.user?.name  || '—';
+  if ($('configTotalLanc'))    $('configTotalLanc').textContent    = state.lancamentos.length;
+  if ($('configTotalCartoes')) $('configTotalCartoes').textContent = state.cartoes.length;
+  const cfg = getConfig();
+  const toggle = $('toggleFinn');
+  if (toggle) toggle.checked = cfg.finnAtivo !== false;
+}
+function exportarDados() {
+  const data = { lancamentos: state.lancamentos, cartoes: state.cartoes, exportadoEm: new Date().toISOString() };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `financaspro_backup_${new Date().toISOString().split('T')[0]}.json`;
+  a.click();
+}
+function limparDados() {
+  if (!confirm('⚠️ Isso apagará todos os dados locais. Os dados no Google Sheets não serão afetados. Continuar?')) return;
+  localStorage.removeItem('fp_lancamentos');
+  localStorage.removeItem('fp_cartoes');
+  state.lancamentos = []; state.cartoes = [];
+  renderAll();
+  alert('Dados locais limpos!');
+}
+
+// ══════════════════════════════════════════════════
+// TRANSIÇÃO FINN
+// ══════════════════════════════════════════════════
+function showFinnTransition(callback) {
+  const cfg = getConfig();
+  if (cfg.finnAtivo === false) { if (callback) callback(); return; }
+  const msg = FINN_MSGS[Math.floor(Math.random() * FINN_MSGS.length)];
+  const el = $('finnTransition');
+  const msgEl = $('finnTransitionMsg');
+  if (!el || !msgEl) { if (callback) callback(); return; }
+  msgEl.textContent = msg;
+  el.style.display = 'flex';
+  el.style.opacity = '0';
+  setTimeout(() => { el.style.opacity = '1'; }, 10);
+  setTimeout(() => {
+    el.style.opacity = '0';
+    setTimeout(() => {
+      el.style.display = 'none';
+      if (callback) callback();
+    }, 400);
+  }, 2200);
+}
+
+function switchTab(tab) {
+  if (tab !== 'dashboard') {
+    showFinnTransition(() => _doSwitchTab(tab));
+  } else {
+    _doSwitchTab(tab);
+  }
+  closeSidebar();
+}
+
+function _doSwitchTab(tab) {
+  $('topbarTitle').textContent = TAB_TITLES[tab] || tab;
+  document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  const tabEl = $('tab-' + tab);
+  if (tabEl) tabEl.style.display = 'block';
+  document.querySelector('[data-tab="' + tab + '"]')?.classList.add('active');
+  if (tab === 'relatorios')     renderRelatorio();
+  if (tab === 'comparativo')    renderComparativo();
+  if (tab === 'dre')            renderDRE();
+  if (tab === 'caixinhas')      renderCaixinhas();
+  if (tab === 'analise-cartao') renderAnaliseCartao();
+  if (tab === 'fluxo')          renderFluxo();
+  if (tab === 'configuracoes')  renderConfiguracoes();
+}
+
+// ══════════════════════════════════════════════════
+// SIDEBAR MOBILE
+// ══════════════════════════════════════════════════
+function toggleSidebar() {
+  $('sidebar').classList.toggle('open');
+  $('sidebarOverlay').classList.toggle('open');
+}
+function closeSidebar() {
+  $('sidebar').classList.remove('open');
+  $('sidebarOverlay').classList.remove('open');
+}
+
+// ══════════════════════════════════════════════════
+// FINN POPUP (canto inferior)
+// ══════════════════════════════════════════════════
+function showFinn() {
+  const el = $('finn');
+  const msg = FINN_MSGS[Math.floor(Math.random() * FINN_MSGS.length)];
+  if ($('finnMsg')) $('finnMsg').textContent = msg;
+  if (el) el.style.display = 'flex';
+  setTimeout(closeFinn, 3200);
+}
+function closeFinn() {
+  const el = $('finn');
+  if (el) el.style.display = 'none';
+}
+
+// ══════════════════════════════════════════════════
+// INIT DOM
+// ══════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  const today = new Date().toISOString().split('T')[0];
+  const fData = $('fData');
+  if (fData) fData.value = today;
+  const modal     = $('modal');
+  const cardModal = $('cardModal');
+  if (modal)     modal.addEventListener('click',     e => { if (e.target === modal)     closeModal(); });
+  if (cardModal) cardModal.addEventListener('click', e => { if (e.target === cardModal) closeCardModal(); });
+});
