@@ -462,6 +462,8 @@ function renderLancamentos() {
           ${l.pagamento?`<span class="lanc-badge">${escHtml(l.pagamento)}</span>`:''}
           <span>${formatDate(l.data)}</span>
           ${l.recorrente?'<span class="lanc-badge recorrente">🔄 Recorrente</span>':''}
+          ${l.parcelado?`<span class="lanc-badge parcelado">💳 ${l.parcelaAtual}/${l.nParcelas} parcelas</span>`:''}
+          ${l.parcelado&&l.jurosReais>0?`<span class="lanc-badge juros">⚠️ Juros: ${fmt(l.jurosReais)}</span>`:''}
         </div>
       </div>
       <div class="lanc-val ${l.tipo}">${l.tipo==='receita'?'+':'-'}${fmt(l.valor)}</div>
@@ -482,31 +484,125 @@ function populateCatFilter() {
 // MODAL LANÇAMENTO
 // ══════════════════════════════════════════════════
 function openModal(edit=null) {
-  state.editId=edit?edit.id:null;
-  $('modalTitle').textContent=edit?'Editar Lançamento':'Novo Lançamento';
-  const today=new Date().toISOString().split('T')[0];
-  $('fTipo').value=edit?edit.tipo:'despesa';
-  $('fDesc').value=edit?edit.descricao:'';
-  $('fValor').value=edit?edit.valor:'';
-  $('fData').value=edit?edit.data:today;
-  $('fPagamento').value=edit?(edit.pagamento||'🏦 PIX'):'🏦 PIX';
-  $('fObs').value=edit?(edit.obs||''):'';
-  $('fRecorrente').checked=edit?!!edit.recorrente:false;
+  state.editId = edit ? edit.id : null;
+  $('modalTitle').textContent = edit ? 'Editar Lançamento' : 'Novo Lançamento';
+  const today = new Date().toISOString().split('T')[0];
+  $('fTipo').value      = edit ? edit.tipo                        : 'despesa';
+  $('fDesc').value      = edit ? edit.descricao                   : '';
+  $('fValor').value     = edit ? edit.valor                       : '';
+  $('fData').value      = edit ? edit.data                        : today;
+  $('fPagamento').value = edit ? (edit.pagamento || '🏦 PIX')    : '🏦 PIX';
+  $('fObs').value       = edit ? (edit.obs || '')                 : '';
+  $('fRecorrente').checked = edit ? !!edit.recorrente             : false;
+
+  // Campos de parcelamento
+  const isParcelado = edit && edit.parcelado;
+  if ($('fParcelado'))      $('fParcelado').checked = !!isParcelado;
+  if ($('parcelamentoCampos')) $('parcelamentoCampos').style.display = isParcelado ? 'block' : 'none';
+  if ($('fValorTotal'))     $('fValorTotal').value     = isParcelado ? edit.valorTotal    : '';
+  if ($('fParcelas'))       $('fParcelas').value        = isParcelado ? edit.nParcelas     : '';
+  if ($('fParcelaAtual'))   $('fParcelaAtual').value    = isParcelado ? edit.parcelaAtual  : '1';
+  if ($('fJurosReais'))     $('fJurosReais').value      = isParcelado ? edit.jurosReais    : '';
+  if ($('parcelamentoPreview')) $('parcelamentoPreview').style.display = 'none';
+
   updateCategorias();
-  if(edit) $('fCategoria').value=edit.categoria;
+  if (edit) $('fCategoria').value = edit.categoria;
   toggleCartaoRow();
-  $('modal').style.display='flex';
+  if (isParcelado) calcularParcelamento();
+  $('modal').style.display = 'flex';
 }
 function closeModal(){$('modal').style.display='none';}
 
 function toggleCartaoRow() {
-  const show=$('fPagamento').value.includes('Crédito');
-  $('cartaoRow').style.display=show?'flex':'none';
-  if(show){
-    $('fCartao').innerHTML=state.cartoes.length
-      ?state.cartoes.map(c=>`<option value="${c.id}">${escHtml(c.nome)}</option>`).join('')
-      :'<option value="">Nenhum cartão cadastrado</option>';
+  const show = $('fPagamento').value.includes('Crédito');
+  $('cartaoRow').style.display = show ? 'flex' : 'none';
+  $('parcelamentoRow').style.display = show ? 'block' : 'none';
+  if (!show) {
+    $('fParcelado').checked = false;
+    $('parcelamentoCampos').style.display = 'none';
   }
+  if (show) {
+    $('fCartao').innerHTML = state.cartoes.length
+      ? state.cartoes.map(c => `<option value="${c.id}">${escHtml(c.nome)}</option>`).join('')
+      : '<option value="">Nenhum cartão cadastrado</option>';
+  }
+}
+
+function toggleParcelamento() {
+  const ativo = $('fParcelado').checked;
+  $('parcelamentoCampos').style.display = ativo ? 'block' : 'none';
+  if (!ativo) {
+    $('parcelamentoPreview').style.display = 'none';
+    // Restaura valor original se havia sido alterado
+    $('fValorTotal').value = '';
+    $('fParcelas').value = '';
+    $('fParcelaAtual').value = '1';
+    $('fJurosReais').value = '';
+  }
+}
+
+function calcularParcelamento() {
+  const valorTotal  = parseFloat($('fValorTotal')?.value) || 0;
+  const nParcelas   = parseInt($('fParcelas')?.value)    || 0;
+  const parcelaAtual = parseInt($('fParcelaAtual')?.value) || 1;
+  const jurosReais  = parseFloat($('fJurosReais')?.value) || 0;
+  const preview     = $('parcelamentoPreview');
+  if (!preview) return;
+
+  if (!valorTotal || !nParcelas) {
+    preview.style.display = 'none';
+    return;
+  }
+
+  const valorComJuros   = valorTotal + jurosReais;
+  const valorParcela    = valorComJuros / nParcelas;
+  const pctJuros        = jurosReais > 0 ? ((jurosReais / valorTotal) * 100).toFixed(2) : 0;
+  const pctJurosMensal  = jurosReais > 0 ? ((Math.pow(1 + (jurosReais/valorTotal), 1/nParcelas) - 1) * 100).toFixed(2) : 0;
+  const jaParcelasoPagas = parcelaAtual - 1;
+  const totalJaParcelasoPago = jaParcelasoPagas * valorParcela;
+  const totalRestante   = valorComJuros - totalJaParcelasoPago;
+
+  // Atualiza o campo valor da parcela automaticamente
+  $('fValor').value = valorParcela.toFixed(2);
+
+  preview.style.display = 'flex';
+  preview.style.flexDirection = 'column';
+  preview.style.gap = '6px';
+  preview.innerHTML = `
+    <div class="parcel-destaque">
+      <span class="parcel-label">💳 Valor desta parcela (${parcelaAtual}/${nParcelas})</span>
+      <span class="parcel-val">${fmt(valorParcela)}</span>
+    </div>
+    <div class="parcel-linha">
+      <span class="parcel-label">Valor original da compra</span>
+      <span class="parcel-val">${fmt(valorTotal)}</span>
+    </div>
+    <div class="parcel-linha">
+      <span class="parcel-label">Total com juros</span>
+      <span class="parcel-val">${fmt(valorComJuros)}</span>
+    </div>
+    ${jurosReais > 0 ? `
+    <div class="parcel-linha">
+      <span class="parcel-label">Total em juros (R$)</span>
+      <span class="parcel-val vermelho">${fmt(jurosReais)}</span>
+    </div>
+    <div class="parcel-linha">
+      <span class="parcel-label">% de juros total</span>
+      <span class="parcel-val vermelho">${pctJuros}%</span>
+    </div>
+    <div class="parcel-linha">
+      <span class="parcel-label">% de juros ao mês (aprox.)</span>
+      <span class="parcel-val dourado">${pctJurosMensal}% a.m.</span>
+    </div>` : ''}
+    <div class="parcel-linha">
+      <span class="parcel-label">Parcelas restantes</span>
+      <span class="parcel-val">${nParcelas - parcelaAtual + 1} de ${nParcelas}</span>
+    </div>
+    <div class="parcel-linha">
+      <span class="parcel-label">Saldo devedor restante</span>
+      <span class="parcel-val vermelho">${fmt(totalRestante)}</span>
+    </div>
+  `;
 }
 function updateCategorias() {
   const cats=$('fTipo').value==='receita'?CATEGORIAS_RECEITA:CATEGORIAS_DESPESA;
@@ -520,14 +616,28 @@ function saveLancamento() {
   if(!desc||isNaN(valor)||valor<=0||!data||!cat){
     alert('Preencha todos os campos obrigatórios.');return;
   }
+  // Dados de parcelamento
+  const parcelado = $('fParcelado')?.checked && pag.includes('Crédito');
+  const parcelInfo = parcelado ? {
+    parcelado:    true,
+    valorTotal:   parseFloat($('fValorTotal')?.value) || valor,
+    nParcelas:    parseInt($('fParcelas')?.value)     || 1,
+    parcelaAtual: parseInt($('fParcelaAtual')?.value) || 1,
+    jurosReais:   parseFloat($('fJurosReais')?.value) || 0,
+    pctJuros:     parseFloat($('fJurosReais')?.value) > 0
+      ? (((parseFloat($('fJurosReais')?.value) || 0) / (parseFloat($('fValorTotal')?.value) || valor)) * 100).toFixed(2)
+      : 0,
+  } : { parcelado: false };
+
   if(state.editId){
     const idx=state.lancamentos.findIndex(l=>l.id===state.editId);
-    if(idx!==-1) state.lancamentos[idx]={...state.lancamentos[idx],tipo,descricao:desc,valor,categoria:cat,data,pagamento:pag,obs,recorrente:rec};
+    if(idx!==-1) state.lancamentos[idx]={...state.lancamentos[idx],tipo,descricao:desc,valor,categoria:cat,data,pagamento:pag,obs,recorrente:rec,...parcelInfo};
   } else {
     const novo={
       id:'l_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),
       tipo,descricao:desc,valor,categoria:cat,data,pagamento:pag,obs,recorrente:rec,
       cartaoId:pag.includes('Crédito')?($('fCartao').value||''):'',
+      ...parcelInfo,
     };
     state.lancamentos.push(novo);
     saveToSheets(novo);
@@ -1212,6 +1322,115 @@ function salvarConfig() {
   cfg.finnAtivo = $('toggleFinn') ? $('toggleFinn').checked : true;
   saveConfig(cfg);
 }
+
+// ══════════════════════════════════════════════════
+// SINCRONIZAÇÃO
+// ══════════════════════════════════════════════════
+function setSyncStatus(status, msg) {
+  const el = $('configSyncStatus');
+  if (!el) return;
+  const map = {
+    ok:      { text:'✅ Conectado',      cls:'status-ok' },
+    erro:    { text:'❌ Sem conexão',     cls:'status-erro' },
+    sincronizando: { text:'🔄 Sincronizando...', cls:'status-sync' },
+    pendente:{ text:'⏳ Não verificado', cls:'status-pendente' },
+  };
+  const s = map[status] || map.pendente;
+  el.textContent = msg || s.text;
+  el.className = 'config-val config-status-badge ' + s.cls;
+}
+
+function setUltimoSync() {
+  const el = $('configUltimoSync');
+  if (el) el.textContent = new Date().toLocaleString('pt-BR');
+  localStorage.setItem('fp_ultimo_sync', new Date().toISOString());
+}
+
+function addSyncLog(msg, tipo = 'info') {
+  const log = $('syncLog');
+  if (!log) return;
+  log.style.display = 'block';
+  const cores = { info:'var(--texto-medio)', ok:'var(--verde-positivo)', erro:'var(--vermelho)', warn:'var(--dourado-escuro)' };
+  const line = document.createElement('div');
+  line.style.cssText = `font-size:0.78rem;padding:3px 0;color:${cores[tipo]||cores.info};border-bottom:1px solid var(--bege);`;
+  line.textContent = `[${new Date().toLocaleTimeString('pt-BR')}] ${msg}`;
+  log.insertBefore(line, log.firstChild);
+  if (log.children.length > 8) log.removeChild(log.lastChild);
+}
+
+async function testarConexao() {
+  setSyncStatus('sincronizando', '🔄 Testando...');
+  addSyncLog('Iniciando teste de conexão...', 'info');
+  try {
+    const url = `${CONFIG.SHEETS_URL}?action=checkAccess&email=${encodeURIComponent(state.user.email)}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.authorized !== undefined) {
+      setSyncStatus('ok');
+      addSyncLog('Conexão com Google Sheets: OK ✅', 'ok');
+      addSyncLog(`E-mail autorizado: ${state.user.email}`, 'ok');
+    } else {
+      setSyncStatus('erro');
+      addSyncLog('Sheets respondeu mas retornou formato inesperado', 'warn');
+    }
+  } catch(e) {
+    setSyncStatus('erro');
+    addSyncLog('Erro de conexão: ' + e.message, 'erro');
+    addSyncLog('Verifique se a URL do Apps Script está correta', 'warn');
+  }
+}
+
+async function sincronizarAgora() {
+  setSyncStatus('sincronizando', '🔄 Sincronizando...');
+  addSyncLog('Baixando dados do Google Sheets...', 'info');
+  try {
+    const url = `${CONFIG.SHEETS_URL}?action=getData&email=${encodeURIComponent(state.user.email)}`;
+    const res  = await fetch(url);
+    const data = await res.json();
+    if (data.lancamentos) {
+      const antesL = state.lancamentos.length;
+      const antesC = state.cartoes.length;
+      state.lancamentos = data.lancamentos;
+      if (data.cartoes && data.cartoes.length) state.cartoes = data.cartoes;
+      saveLocal();
+      renderAll();
+      setSyncStatus('ok');
+      setUltimoSync();
+      addSyncLog(`Sincronizado! ${data.lancamentos.length} lançamentos (era ${antesL})`, 'ok');
+      if (data.cartoes) addSyncLog(`${data.cartoes.length} cartões sincronizados (era ${antesC})`, 'ok');
+      renderConfiguracoes();
+    } else {
+      setSyncStatus('erro');
+      addSyncLog('Sheets não retornou dados. Resposta: ' + JSON.stringify(data).slice(0,80), 'warn');
+    }
+  } catch(e) {
+    setSyncStatus('erro');
+    addSyncLog('Erro ao sincronizar: ' + e.message, 'erro');
+  }
+}
+
+async function enviarParaSheets() {
+  if (!state.lancamentos.length) {
+    addSyncLog('Nenhum lançamento local para enviar.', 'warn');
+    return;
+  }
+  setSyncStatus('sincronizando', '🔄 Enviando...');
+  addSyncLog(`Enviando ${state.lancamentos.length} lançamentos para Sheets...`, 'info');
+  let ok = 0, erros = 0;
+  for (const lanc of state.lancamentos) {
+    try {
+      await fetch(CONFIG.SHEETS_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action:'saveData', email: state.user.email, lancamento: lanc }),
+      });
+      ok++;
+    } catch(e) { erros++; }
+  }
+  setSyncStatus(erros === 0 ? 'ok' : 'erro');
+  setUltimoSync();
+  addSyncLog(`Envio concluído: ${ok} lançamentos enviados, ${erros} erros.`, erros === 0 ? 'ok' : 'erro');
+}
+
 function renderConfiguracoes() {
   if ($('configEmail')) $('configEmail').textContent = state.user?.email || '—';
   if ($('configNome'))  $('configNome').textContent  = state.user?.name  || '—';
@@ -1220,6 +1439,14 @@ function renderConfiguracoes() {
   const cfg = getConfig();
   const toggle = $('toggleFinn');
   if (toggle) toggle.checked = cfg.finnAtivo !== false;
+  // Último sync
+  const ultimo = localStorage.getItem('fp_ultimo_sync');
+  const ultimoEl = $('configUltimoSync');
+  if (ultimoEl && ultimo) ultimoEl.textContent = new Date(ultimo).toLocaleString('pt-BR');
+  // Limpar log ao abrir
+  const log = $('syncLog');
+  if (log) { log.style.display = 'none'; log.innerHTML = ''; }
+  setSyncStatus('pendente');
 }
 function exportarDados() {
   const data = { lancamentos: state.lancamentos, cartoes: state.cartoes, exportadoEm: new Date().toISOString() };
