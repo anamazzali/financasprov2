@@ -247,24 +247,31 @@ function saveLocal() {
 async function loadFromSheets() {
   if (!state.user) return;
   try {
-    const res  = await fetch(`${CONFIG.SHEETS_URL}?action=getData&email=${encodeURIComponent(state.user.email)}`);
-    const data = await res.json();
+    const url = CONFIG.SHEETS_URL + '?action=getData&email=' + encodeURIComponent(state.user.email);
+    const res  = await fetch(url, { redirect: 'follow' });
+    const text = await res.text();
+    const data = JSON.parse(text);
     if (data.lancamentos) {
       state.lancamentos = data.lancamentos;
-      if (data.cartoes) state.cartoes = data.cartoes;
-      saveLocal(); renderAll();
+      if (data.cartoes && data.cartoes.length) state.cartoes = data.cartoes;
+      saveLocal();
+      renderAll();
+      localStorage.setItem('fp_ultimo_sync', new Date().toISOString());
     }
-  } catch(e) {}
+  } catch(e) { console.warn('loadFromSheets:', e); }
 }
+
 async function saveToSheets(lancamento) {
   if (!state.user || !CONFIG.SHEETS_URL.startsWith('https')) return;
   try {
     await fetch(CONFIG.SHEETS_URL, {
-      method:'POST',
+      method: 'POST',
+      redirect: 'follow',
       body: JSON.stringify({ action:'saveData', email: state.user.email, lancamento }),
     });
-  } catch(e) {}
+  } catch(e) { console.warn('saveToSheets:', e); }
 }
+
 
 // ══════════════════════════════════════════════════
 // MÊS
@@ -1448,6 +1455,71 @@ function renderConfiguracoes() {
   if (log) { log.style.display = 'none'; log.innerHTML = ''; }
   setSyncStatus('pendente');
 }
+
+// ══════════════════════════════════════════════════
+// EXPORTAÇÃO CSV / GOOGLE DRIVE
+// ══════════════════════════════════════════════════
+function exportarCSV(tipo = 'lancamentos') {
+  let csv = '', nome = '';
+
+  if (tipo === 'lancamentos') {
+    nome = `financaspro_lancamentos_${MONTHS[state.currentMonth]}${state.currentYear}.csv`;
+    const items = getLancamentosMes();
+    csv = 'Data,Tipo,Descrição,Categoria,Valor,Pagamento,Parcelado,Parcela,Total Parcelas,Juros R$,% Juros,Observação\n';
+    items.forEach(l => {
+      csv += [
+        l.data, l.tipo, '"'+escHtml(l.descricao)+'"', l.categoria,
+        parseFloat(l.valor||0).toFixed(2).replace('.',','),
+        '"'+(l.pagamento||'')+'"',
+        l.parcelado ? 'Sim' : 'Não',
+        l.parcelado ? (l.parcelaAtual||1) : '',
+        l.parcelado ? (l.nParcelas||1) : '',
+        l.parcelado ? (parseFloat(l.jurosReais||0).toFixed(2).replace('.',',')) : '',
+        l.parcelado ? (l.pctJuros||0)+'%' : '',
+        '"'+(l.obs||'')+'"',
+      ].join(';') + '\n';
+    });
+  }
+
+  if (tipo === 'anual') {
+    nome = `financaspro_anual_${state.currentYear}.csv`;
+    csv = 'Mês,Receitas,Despesas,Saldo,Taxa Economia%\n';
+    for (let m = 0; m < 12; m++) {
+      const it = getLancamentosMes(m, state.currentYear);
+      const rec  = sumBy(it, 'receita');
+      const desp = sumBy(it, 'despesa');
+      const sal  = rec - desp;
+      const taxa = rec > 0 ? ((sal/rec)*100).toFixed(1) : 0;
+      csv += `${MONTHS[m]}/${state.currentYear};${rec.toFixed(2).replace('.',',')};${desp.toFixed(2).replace('.',',')};${sal.toFixed(2).replace('.',',')};${taxa}%\n`;
+    }
+  }
+
+  if (tipo === 'cartoes') {
+    nome = `financaspro_cartoes_${MONTHS[state.currentMonth]}${state.currentYear}.csv`;
+    csv = 'Cartão,Limite,Fechamento,Vencimento,Fatura do Mês,% Utilizado\n';
+    const mes = getLancamentosMes();
+    state.cartoes.forEach(c => {
+      const fat   = mes.filter(l => l.cartaoId === c.id).reduce((s,l) => s+parseFloat(l.valor||0), 0);
+      const pct   = c.limite > 0 ? ((fat/c.limite)*100).toFixed(1) : 0;
+      csv += `"${c.nome}";${(c.limite||0).toFixed(2).replace('.',',')};${c.fechamento||''};${c.vencimento||''};${fat.toFixed(2).replace('.',',')};${pct}%\n`;
+    });
+  }
+
+  // Download
+  const BOM = '\uFEFF'; // BOM para Excel reconhecer UTF-8
+  const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = nome;
+  a.click();
+}
+
+function abrirNoGoogleSheets() {
+  // Abre a planilha financeira do usuário direto
+  const sheetsUrl = 'https://docs.google.com/spreadsheets/';
+  window.open(sheetsUrl, '_blank');
+}
+
 function exportarDados() {
   const data = { lancamentos: state.lancamentos, cartoes: state.cartoes, exportadoEm: new Date().toISOString() };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
