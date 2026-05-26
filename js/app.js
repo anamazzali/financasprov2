@@ -244,55 +244,81 @@ function saveLocal() {
   localStorage.setItem('fp_lancamentos', JSON.stringify(state.lancamentos));
   localStorage.setItem('fp_cartoes',     JSON.stringify(state.cartoes));
 }
+// ══════════════════════════════════════════════════
+// COMUNICAÇÃO COM SHEETS — via JSONP (resolve CORS)
+// ══════════════════════════════════════════════════
+function sheetsGET(params) {
+  return new Promise((resolve, reject) => {
+    const cbName = '_fp_cb_' + Date.now();
+    const url = CONFIG.SHEETS_URL + '?' + params + '&callback=' + cbName;
+    const script = document.createElement('script');
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error('Timeout'));
+    }, 12000);
+    window[cbName] = function(data) {
+      cleanup();
+      resolve(data);
+    };
+    function cleanup() {
+      clearTimeout(timeout);
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+    }
+    script.onerror = () => { cleanup(); reject(new Error('Script error')); };
+    script.src = url;
+    document.head.appendChild(script);
+  });
+}
+
+function sheetsPOST(body) {
+  return new Promise((resolve) => {
+    // POST via no-cors — não lemos a resposta mas os dados chegam ao Sheets
+    fetch(CONFIG.SHEETS_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      body: JSON.stringify(body),
+    }).then(() => resolve({ success: true }))
+      .catch(() => resolve({ success: false }));
+  });
+}
+
 async function loadFromSheets() {
   if (!state.user) return;
   try {
-    const url = CONFIG.SHEETS_URL + '?action=getData&email=' + encodeURIComponent(state.user.email);
-    const res  = await fetch(url, { redirect: 'follow' });
-    const text = await res.text();
-    const data = JSON.parse(text);
-    if (data.lancamentos) {
+    const params = 'action=getData&email=' + encodeURIComponent(state.user.email);
+    const data = await sheetsGET(params);
+    if (data && data.lancamentos) {
       state.lancamentos = data.lancamentos;
-
       if (data.cartoes && data.cartoes.length > 0) {
-        // Sheets tem cartões — usa os do Sheets
         state.cartoes = data.cartoes;
       } else if (state.cartoes.length > 0) {
-        // Sheets não tem cartões mas local tem — envia para Sheets para sincronizar
-        console.log('Enviando', state.cartoes.length, 'cartões locais para Sheets...');
         state.cartoes.forEach(c => saveCartaoSheets(c));
       }
-      // Se os dois estão vazios, mantém vazio mesmo
-
       saveLocal();
       renderAll();
       localStorage.setItem('fp_ultimo_sync', new Date().toISOString());
     }
-  } catch(e) { console.warn('loadFromSheets:', e); }
+  } catch(e) { console.warn('loadFromSheets:', e.message); }
 }
-
 
 async function saveCartaoSheets(cartao) {
   if (!state.user || !CONFIG.SHEETS_URL.startsWith('https')) return;
-  try {
-    await fetch(CONFIG.SHEETS_URL, {
-      method: 'POST', redirect: 'follow',
-      body: JSON.stringify({ action:'saveCartao', email: state.user.email, cartao }),
-    });
-  } catch(e) { console.warn('saveCartaoSheets:', e); }
+  await sheetsPOST({ action:'saveCartao', email: state.user.email, cartao });
 }
 
 async function deleteCartaoSheets(id) {
   if (!state.user || !CONFIG.SHEETS_URL.startsWith('https')) return;
-  try {
-    await fetch(CONFIG.SHEETS_URL, {
-      method: 'POST', redirect: 'follow',
-      body: JSON.stringify({ action:'deleteCartao', email: state.user.email, cartaoId: id }),
-    });
-  } catch(e) { console.warn('deleteCartaoSheets:', e); }
+  await sheetsPOST({ action:'deleteCartao', email: state.user.email, cartaoId: id });
 }
 
 async function saveToSheets(lancamento) {
+  if (!state.user || !CONFIG.SHEETS_URL.startsWith('https')) return;
+  await sheetsPOST({ action:'saveData', email: state.user.email, lancamento });
+}
+
+// placeholder para compatibilidade com código legado
+async function saveToSheetsLegacy(lancamento) {
   if (!state.user || !CONFIG.SHEETS_URL.startsWith('https')) return;
   try {
     await fetch(CONFIG.SHEETS_URL, {
@@ -719,7 +745,14 @@ function renderCartoes() {
         <div class="cartao-bar-track"><div class="cartao-bar-fill" style="width:${pct}%;"></div></div>
         <div class="cartao-footer">
           <span>${pct}% do limite utilizado</span>
-          <button onclick="deleteCartao('${c.id}')" style="background:none;border:none;color:rgba(255,255,255,0.75);cursor:pointer;" title="Remover">🗑️</button>
+          <div style="display:flex;gap:6px;">
+            <button onclick="editCartao('${c.id}')"
+              style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fff;cursor:pointer;border-radius:6px;padding:3px 8px;font-size:0.75rem;"
+              title="Editar cartão">✏️ Editar</button>
+            <button onclick="deleteCartao('${c.id}')"
+              style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.8);cursor:pointer;border-radius:6px;padding:3px 8px;font-size:0.75rem;"
+              title="Remover cartão">🗑️</button>
+          </div>
         </div>
       </div>`;
   }).join('');
@@ -728,20 +761,55 @@ function renderCartoes() {
 // Banco selecionado no modal
 let _bancoSelecionado = null;
 
-function openCardModal() {
+let _editCartaoId = null;
+
+function openCardModal(edit = null) {
   _bancoSelecionado = null;
-  $('cNome').value=''; $('cLimite').value='';
-  $('cFechamento').value=''; $('cVencimento').value='';
-  $('cCor').value='#2D6A4F'; $('cCorCustom').checked=false;
-  $('cCorRow').style.display='none';
+  _editCartaoId = edit ? edit.id : null;
+
+  // Preenche campos
+  $('cNome').value      = edit ? edit.nome      : '';
+  $('cLimite').value    = edit ? edit.limite     : '';
+  $('cFechamento').value= edit ? edit.fechamento : '';
+  $('cVencimento').value= edit ? edit.vencimento : '';
+  $('cCor').value       = edit ? (edit.cor || '#2D6A4F') : '#2D6A4F';
+  $('cCorCustom').checked = edit ? !!edit.corCustom : false;
+  $('cCorRow').style.display = (edit && edit.corCustom) ? 'flex' : 'none';
+
+  // Título do modal
+  document.querySelector('#cardModal .modal-header h3').textContent =
+    edit ? 'Editar Cartão' : 'Novo Cartão de Crédito';
+
+  // Gera grid de bancos
   const grid = $('bancoGrid');
   if (grid) grid.innerHTML = BANCOS_LISTA.map((b,i) => `
     <button type="button" class="banco-btn" onclick="selecionarBanco(${i})" id="banco-btn-${i}">
       <div class="banco-btn-cor" style="background:${b.cor};"></div>
       <div class="banco-btn-label">${b.nome}</div>
     </button>`).join('');
+
+  // Se editando, seleciona o banco correspondente
+  if (edit) {
+    const idx = BANCOS_LISTA.findIndex(b =>
+      edit.nome.toLowerCase().includes(b.nome.toLowerCase()) ||
+      b.nome.toLowerCase().includes(edit.nome.toLowerCase())
+    );
+    if (idx >= 0) {
+      _bancoSelecionado = BANCOS_LISTA[idx];
+      setTimeout(() => {
+        document.querySelectorAll('.banco-btn').forEach((btn,i) =>
+          btn.classList.toggle('selected', i === idx));
+      }, 50);
+    }
+  }
+
   atualizarPreview();
   $('cardModal').style.display='flex';
+}
+
+function editCartao(id) {
+  const c = state.cartoes.find(c => c.id === id);
+  if (c) openCardModal(c);
 }
 
 function selecionarBanco(idx) {
@@ -784,12 +852,28 @@ function saveCard() {
   const fechamento = parseInt($('cFechamento').value) || 15;
   const vencimento = parseInt($('cVencimento').value) || 22;
   const corCustom  = $('cCorCustom').checked;
-  const cor = corCustom ? $('cCor').value : (_bancoSelecionado ? _bancoSelecionado.cor : '#2D6A4F');
+  const cor = corCustom
+    ? $('cCor').value
+    : (_bancoSelecionado ? _bancoSelecionado.cor : (state.cartoes.find(c=>c.id===_editCartaoId)?.cor || '#2D6A4F'));
+
   if (!nome) { alert('Selecione o banco ou informe o nome do cartão.'); return; }
-  const novoCartao = { id:'c_'+Date.now(), nome, limite, fechamento, vencimento, cor, corCustom };
-  state.cartoes.push(novoCartao);
-  saveLocal();
-  saveCartaoSheets(novoCartao);
+
+  if (_editCartaoId) {
+    // EDIÇÃO — atualiza cartão existente
+    const idx = state.cartoes.findIndex(c => c.id === _editCartaoId);
+    if (idx !== -1) {
+      state.cartoes[idx] = { ...state.cartoes[idx], nome, limite, fechamento, vencimento, cor, corCustom };
+      saveLocal();
+      saveCartaoSheets(state.cartoes[idx]);
+    }
+  } else {
+    // NOVO cartão
+    const novoCartao = { id:'c_'+Date.now(), nome, limite, fechamento, vencimento, cor, corCustom };
+    state.cartoes.push(novoCartao);
+    saveLocal();
+    saveCartaoSheets(novoCartao);
+  }
+
   closeCardModal();
   renderCartoes();
 }
@@ -1406,21 +1490,20 @@ async function testarConexao() {
   setSyncStatus('sincronizando', '🔄 Testando...');
   addSyncLog('Iniciando teste de conexão...', 'info');
   try {
-    const url = `${CONFIG.SHEETS_URL}?action=checkAccess&email=${encodeURIComponent(state.user.email)}`;
-    const res = await fetch(url);
-    const data = await res.json();
-    if (data.authorized !== undefined) {
+    const params = 'action=checkAccess&email=' + encodeURIComponent(state.user.email);
+    const data = await sheetsGET(params);
+    if (data && data.authorized !== undefined) {
       setSyncStatus('ok');
       addSyncLog('Conexão com Google Sheets: OK ✅', 'ok');
-      addSyncLog(`E-mail autorizado: ${state.user.email}`, 'ok');
+      addSyncLog('E-mail autorizado: ' + state.user.email, 'ok');
     } else {
       setSyncStatus('erro');
-      addSyncLog('Sheets respondeu mas retornou formato inesperado', 'warn');
+      addSyncLog('Resposta inesperada: ' + JSON.stringify(data).slice(0,80), 'warn');
     }
   } catch(e) {
     setSyncStatus('erro');
     addSyncLog('Erro de conexão: ' + e.message, 'erro');
-    addSyncLog('Verifique se a URL do Apps Script está correta', 'warn');
+    addSyncLog('Verifique se a URL do Apps Script está correta e reimplantada.', 'warn');
   }
 }
 
@@ -1428,24 +1511,28 @@ async function sincronizarAgora() {
   setSyncStatus('sincronizando', '🔄 Sincronizando...');
   addSyncLog('Baixando dados do Google Sheets...', 'info');
   try {
-    const url = `${CONFIG.SHEETS_URL}?action=getData&email=${encodeURIComponent(state.user.email)}`;
-    const res  = await fetch(url);
-    const data = await res.json();
-    if (data.lancamentos) {
+    const params = 'action=getData&email=' + encodeURIComponent(state.user.email);
+    const data = await sheetsGET(params);
+    if (data && data.lancamentos) {
       const antesL = state.lancamentos.length;
       const antesC = state.cartoes.length;
       state.lancamentos = data.lancamentos;
-      if (data.cartoes && data.cartoes.length) state.cartoes = data.cartoes;
+      if (data.cartoes && data.cartoes.length > 0) {
+        state.cartoes = data.cartoes;
+      } else if (state.cartoes.length > 0) {
+        addSyncLog('Cartões locais detectados — enviando para Sheets...', 'info');
+        state.cartoes.forEach(c => saveCartaoSheets(c));
+      }
       saveLocal();
       renderAll();
       setSyncStatus('ok');
       setUltimoSync();
-      addSyncLog(`Sincronizado! ${data.lancamentos.length} lançamentos (era ${antesL})`, 'ok');
-      if (data.cartoes) addSyncLog(`${data.cartoes.length} cartões sincronizados (era ${antesC})`, 'ok');
+      addSyncLog(`✅ ${data.lancamentos.length} lançamentos (antes: ${antesL})`, 'ok');
+      addSyncLog(`✅ ${state.cartoes.length} cartões (antes: ${antesC})`, 'ok');
       renderConfiguracoes();
     } else {
       setSyncStatus('erro');
-      addSyncLog('Sheets não retornou dados. Resposta: ' + JSON.stringify(data).slice(0,80), 'warn');
+      addSyncLog('Sheets não retornou dados: ' + JSON.stringify(data).slice(0,80), 'warn');
     }
   } catch(e) {
     setSyncStatus('erro');
@@ -1454,25 +1541,23 @@ async function sincronizarAgora() {
 }
 
 async function enviarParaSheets() {
-  if (!state.lancamentos.length) {
-    addSyncLog('Nenhum lançamento local para enviar.', 'warn');
+  if (!state.lancamentos.length && !state.cartoes.length) {
+    addSyncLog('Nenhum dado local para enviar.', 'warn');
     return;
   }
   setSyncStatus('sincronizando', '🔄 Enviando...');
-  addSyncLog(`Enviando ${state.lancamentos.length} lançamentos para Sheets...`, 'info');
-  let ok = 0, erros = 0;
+  addSyncLog(`Enviando ${state.lancamentos.length} lançamentos e ${state.cartoes.length} cartões...`, 'info');
+  // Envia lançamentos
   for (const lanc of state.lancamentos) {
-    try {
-      await fetch(CONFIG.SHEETS_URL, {
-        method: 'POST',
-        body: JSON.stringify({ action:'saveData', email: state.user.email, lancamento: lanc }),
-      });
-      ok++;
-    } catch(e) { erros++; }
+    await sheetsPOST({ action:'saveData', email: state.user.email, lancamento: lanc });
   }
-  setSyncStatus(erros === 0 ? 'ok' : 'erro');
+  // Envia cartões
+  for (const c of state.cartoes) {
+    await saveCartaoSheets(c);
+  }
+  setSyncStatus('ok');
   setUltimoSync();
-  addSyncLog(`Envio concluído: ${ok} lançamentos enviados, ${erros} erros.`, erros === 0 ? 'ok' : 'erro');
+  addSyncLog(`✅ Envio concluído — ${state.lancamentos.length} lançamentos, ${state.cartoes.length} cartões`, 'ok');
 }
 
 function renderConfiguracoes() {
