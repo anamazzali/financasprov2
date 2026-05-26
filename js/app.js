@@ -253,12 +253,43 @@ async function loadFromSheets() {
     const data = JSON.parse(text);
     if (data.lancamentos) {
       state.lancamentos = data.lancamentos;
-      if (data.cartoes && data.cartoes.length) state.cartoes = data.cartoes;
+
+      if (data.cartoes && data.cartoes.length > 0) {
+        // Sheets tem cartões — usa os do Sheets
+        state.cartoes = data.cartoes;
+      } else if (state.cartoes.length > 0) {
+        // Sheets não tem cartões mas local tem — envia para Sheets para sincronizar
+        console.log('Enviando', state.cartoes.length, 'cartões locais para Sheets...');
+        state.cartoes.forEach(c => saveCartaoSheets(c));
+      }
+      // Se os dois estão vazios, mantém vazio mesmo
+
       saveLocal();
       renderAll();
       localStorage.setItem('fp_ultimo_sync', new Date().toISOString());
     }
   } catch(e) { console.warn('loadFromSheets:', e); }
+}
+
+
+async function saveCartaoSheets(cartao) {
+  if (!state.user || !CONFIG.SHEETS_URL.startsWith('https')) return;
+  try {
+    await fetch(CONFIG.SHEETS_URL, {
+      method: 'POST', redirect: 'follow',
+      body: JSON.stringify({ action:'saveCartao', email: state.user.email, cartao }),
+    });
+  } catch(e) { console.warn('saveCartaoSheets:', e); }
+}
+
+async function deleteCartaoSheets(id) {
+  if (!state.user || !CONFIG.SHEETS_URL.startsWith('https')) return;
+  try {
+    await fetch(CONFIG.SHEETS_URL, {
+      method: 'POST', redirect: 'follow',
+      body: JSON.stringify({ action:'deleteCartao', email: state.user.email, cartaoId: id }),
+    });
+  } catch(e) { console.warn('deleteCartaoSheets:', e); }
 }
 
 async function saveToSheets(lancamento) {
@@ -755,8 +786,12 @@ function saveCard() {
   const corCustom  = $('cCorCustom').checked;
   const cor = corCustom ? $('cCor').value : (_bancoSelecionado ? _bancoSelecionado.cor : '#2D6A4F');
   if (!nome) { alert('Selecione o banco ou informe o nome do cartão.'); return; }
-  state.cartoes.push({ id:'c_'+Date.now(), nome, limite, fechamento, vencimento, cor, corCustom });
-  saveLocal(); closeCardModal(); renderCartoes();
+  const novoCartao = { id:'c_'+Date.now(), nome, limite, fechamento, vencimento, cor, corCustom };
+  state.cartoes.push(novoCartao);
+  saveLocal();
+  saveCartaoSheets(novoCartao);
+  closeCardModal();
+  renderCartoes();
 }
 
 // Atualiza preview ao digitar limite
@@ -765,7 +800,9 @@ function onLimiteInput() { atualizarPreview(); }
 function deleteCartao(id){
   if(!confirm('Remover este cartão?'))return;
   state.cartoes=state.cartoes.filter(c=>c.id!==id);
-  saveLocal();renderCartoes();
+  saveLocal();
+  deleteCartaoSheets(id);
+  renderCartoes();
 }
 
 // ══════════════════════════════════════════════════
