@@ -981,3 +981,59 @@ h1,h2,h3,h4,h5 { font-family: 'Sora', sans-serif; font-weight: 700; }
 .csobre-resumo-grid > div strong { font-size: 0.82rem; color: var(--texto-escuro); font-weight: 700; }
 
 @media(max-width:640px) { .caixinhas-sobre-grid { grid-template-columns: 1fr; } }
+
+/* ══════════════════════════════════════════════════
+   PARCELAMENTO
+══════════════════════════════════════════════════ */
+.parcelamento-box {
+  background: var(--bege-claro);
+  border: 1.5px solid var(--bege-escuro);
+  border-radius: 10px;
+  padding: 16px;
+  display: flex; flex-direction: column; gap: 12px;
+  margin-bottom: 4px;
+}
+.form-row-inline {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+}
+.parcelamento-preview {
+  background: #fff;
+  border: 1.5px solid var(--verde-claro);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.parcel-linha {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 0.83rem;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--bege);
+}
+.parcel-linha:last-child { border-bottom: none; }
+.parcel-label { color: var(--texto-medio); }
+.parcel-val   { font-weight: 700; color: var(--texto-escuro); }
+.parcel-val.verde  { color: var(--verde-positivo); }
+.parcel-val.vermelho { color: var(--vermelho); }
+.parcel-val.dourado  { color: var(--dourado-escuro); }
+.parcel-destaque {
+  background: rgba(45,106,79,0.06);
+  border-radius: 8px; padding: 10px 12px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.parcel-destaque .parcel-label { font-weight: 700; color: var(--verde-escuro); font-size: 0.85rem; }
+.parcel-destaque .parcel-val   { font-size: 1rem; color: var(--verde-medio); }
+.lanc-badge.parcelado { background:rgba(0,92,169,0.1);color:#005CA9;font-weight:600; }
+.lanc-badge.juros { background:rgba(192,57,43,0.1);color:var(--vermelho);font-weight:600; }
+
+/* Sync status badges */
+.config-status-badge { font-size:0.82rem; padding:3px 10px; border-radius:50px; font-weight:700; }
+.status-ok      { background:rgba(27,122,62,0.1);  color:var(--verde-positivo); }
+.status-erro    { background:rgba(192,57,43,0.1);  color:var(--vermelho); }
+.status-sync    { background:rgba(212,175,55,0.12);color:var(--dourado-escuro); }
+.status-pendente{ background:var(--bege-escuro);   color:var(--texto-medio); }
+.sync-log {
+  background:var(--bege-claro); border:1px solid var(--bege-escuro);
+  border-radius:8px; padding:10px 12px; margin-top:8px;
+  max-height:160px; overflow-y:auto;
+  display:flex; flex-direction:column; gap:2px;
+}
