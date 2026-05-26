@@ -1,4 +1,3 @@
-
 /* ══════════════════════════════════════════════════
    FinançasPro — App CSS v2.0
    Paleta: PlanilhaProfissional.com
@@ -1038,3 +1037,17 @@ h1,h2,h3,h4,h5 { font-family: 'Sora', sans-serif; font-weight: 700; }
   max-height:160px; overflow-y:auto;
   display:flex; flex-direction:column; gap:2px;
 }
+
+/* Botões de exportação */
+.export-btns { display:flex; gap:6px; align-items:center; }
+.btn-export {
+  display:inline-flex; align-items:center; gap:5px;
+  background: var(--bege); border: 1.5px solid var(--bege-escuro);
+  color: var(--texto-medio); border-radius:50px;
+  padding: 7px 14px; font-family:'Sora',sans-serif;
+  font-size:0.78rem; font-weight:700; cursor:pointer;
+  transition: all .18s;
+}
+.btn-export:hover { background:var(--bege-escuro); color:var(--texto-escuro); }
+.btn-export-green { background:rgba(27,122,62,0.08); border-color:rgba(27,122,62,0.25); color:var(--verde-medio); }
+.btn-export-green:hover { background:var(--verde-medio); color:#fff; }
