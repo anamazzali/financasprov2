@@ -251,13 +251,15 @@ function sheetsGET(params) {
   return new Promise((resolve, reject) => {
     const cbName = '_fp_cb_' + Date.now();
     const url = CONFIG.SHEETS_URL + '?' + params + '&callback=' + cbName;
+    console.log('[Sheets] GET:', url.substring(0,120));
     const script = document.createElement('script');
     const timeout = setTimeout(() => {
       cleanup();
-      reject(new Error('Timeout'));
-    }, 12000);
+      reject(new Error('Timeout — verifique se a URL do Apps Script está correta e reimplantada com Nova Versão'));
+    }, 15000);
     window[cbName] = function(data) {
       cleanup();
+      console.log('[Sheets] Resposta OK:', JSON.stringify(data).substring(0,100));
       resolve(data);
     };
     function cleanup() {
@@ -265,7 +267,11 @@ function sheetsGET(params) {
       delete window[cbName];
       if (script.parentNode) script.parentNode.removeChild(script);
     }
-    script.onerror = () => { cleanup(); reject(new Error('Script error')); };
+    script.onerror = (e) => {
+      cleanup();
+      console.error('[Sheets] Erro script:', e);
+      reject(new Error('Erro ao carregar script do Apps Script — verifique a URL'));
+    };
     script.src = url;
     document.head.appendChild(script);
   });
@@ -693,15 +699,19 @@ function saveLancamento() {
       : 0,
   } : { parcelado: false };
 
+  const cartaoId = pag.includes('Crédito') ? ($('fCartao').value || '') : '';
+
   if(state.editId){
     const idx=state.lancamentos.findIndex(l=>l.id===state.editId);
-    if(idx!==-1) state.lancamentos[idx]={...state.lancamentos[idx],tipo,descricao:desc,valor,categoria:cat,data,pagamento:pag,obs,recorrente:rec,...parcelInfo};
+    if(idx!==-1){
+      state.lancamentos[idx]={...state.lancamentos[idx],tipo,descricao:desc,valor,categoria:cat,data,pagamento:pag,obs,recorrente:rec,cartaoId,...parcelInfo};
+      saveToSheets(state.lancamentos[idx]);
+    }
   } else {
     const novo={
       id:'l_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),
       tipo,descricao:desc,valor,categoria:cat,data,pagamento:pag,obs,recorrente:rec,
-      cartaoId:pag.includes('Crédito')?($('fCartao').value||''):'',
-      ...parcelInfo,
+      cartaoId,...parcelInfo,
     };
     state.lancamentos.push(novo);
     saveToSheets(novo);
