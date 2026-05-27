@@ -97,17 +97,17 @@ const CAT_ICONS = {
 
 // Caixinhas — categorias por grupo
 const CAIXINHAS = [
-  { key:'necessidades', label:'Necessidades',        pct:50, cor:'#2D6A4F', icon:'🏠',
-    cats:['Moradia','Alimentação','Transporte','Saúde','Seguros','Impostos','Empréstimos'] },
+  { key:'necessidades', label:'Necessidades',          pct:50, cor:'#C0392B', icon:'🏠',
+    cats:['Moradia','Alimentação','Transporte','Saúde','Seguros','Impostos','Empréstimos','Cuidados Pessoais','Pet','Jurídico'] },
   { key:'doacao',       label:'Doação / Contribuição', pct:10, cor:'#D4AF37', icon:'❤️',
     cats:['Doações','Igreja/Religião','Presentes'] },
-  { key:'educacao',     label:'Educação',             pct:10, cor:'#52B788', icon:'📚',
+  { key:'educacao',     label:'Educação',              pct:10, cor:'#52B788', icon:'📚',
     cats:['Educação'] },
-  { key:'lazer',        label:'Lazer',                pct:10, cor:'#F0CB5E', icon:'🎬',
-    cats:['Entretenimento','Cuidados Pessoais','Pet'] },
-  { key:'invest_longo', label:'Invest. Longo Prazo',  pct:10, cor:'#1B7A3E', icon:'💹',
+  { key:'lazer',        label:'Lazer',                 pct:10, cor:'#F0CB5E', icon:'🎬',
+    cats:['Entretenimento'] },
+  { key:'invest_longo', label:'Invest. Longo Prazo',   pct:10, cor:'#1B7A3E', icon:'💹',
     cats:['Investimentos Longo Prazo'] },
-  { key:'invest_curto', label:'Invest. Curto Prazo',  pct:10, cor:'#A07820', icon:'📈',
+  { key:'invest_curto', label:'Invest. Curto Prazo',   pct:10, cor:'#A07820', icon:'📈',
     cats:['Investimentos Curto Prazo'] },
 ];
 
