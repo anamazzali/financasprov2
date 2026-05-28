@@ -77,14 +77,19 @@ h1,h2,h3,h4,h5 { font-family: 'Sora', sans-serif; font-weight: 700; }
 
 /* Logo owl */
 .login-logo-wrap {
-  width: 72px; height: 72px;
-  background: linear-gradient(135deg, var(--verde-escuro), var(--verde-medio));
-  border-radius: 20px;
   display: flex; align-items: center; justify-content: center;
-  margin: 0 auto 18px;
-  box-shadow: var(--shadow-md);
+  margin: 0 auto 16px;
+  height: 80px;
 }
-.login-owl { font-size: 2.2rem; line-height: 1; }
+.login-owl {
+  font-size: 3.8rem; line-height: 1;
+  filter: drop-shadow(0 4px 12px rgba(212,175,55,0.35));
+  animation: floatOwl 3s ease-in-out infinite;
+}
+@keyframes floatOwl {
+  0%,100% { transform: translateY(0); }
+  50%      { transform: translateY(-8px); }
+}
 
 .login-title {
   font-size: 1.7rem; font-weight: 800;
@@ -762,7 +767,7 @@ h1,h2,h3,h4,h5 { font-family: 'Sora', sans-serif; font-weight: 700; }
 }
 .comece-dica span { font-size: 1.4rem; flex-shrink: 0; }
 .comece-dica strong { display: block; font-size: 0.9rem; color: var(--dourado-escuro); margin-bottom: 5px; }
-.comece-dica p { font-size: 0.84rem; color: var(--texto-escuro); line-height: 1.65; }
+.comece-dica p { font-size: 0.84rem; color: var(--texto-medio); line-height: 1.65; }
 
 /* ══════════════════════════════════════════════════
    CONFIGURAÇÕES
