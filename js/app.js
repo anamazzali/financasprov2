@@ -436,7 +436,8 @@ function getLancamentosMes(m=state.currentMonth, y=state.currentYear) {
             parcelaAtual: p,
             data: `${yP}-${String(mP+1).padStart(2,'0')}-${String(dataBase.getDate()).padStart(2,'0')}`,
             parcelamentoOrigemId: l.id,
-            _gerado: true, // marcador — não salvar no Sheets
+            cartaoId: l.cartaoId, // preservar explicitamente
+            _gerado: true,
           });
         }
       }
@@ -1254,16 +1255,23 @@ function renderAnaliseCartao() {
     const cor=getCorBanco(c.nome);
     const bg=c.corCustom?c.cor:cor.bg;
 
-    // Dados mensais do ano
+    // Dados mensais do ano — inclui parcelas geradas automaticamente
     const meses=[];
     let totalAno=0;
     for(let m=0;m<12;m++){
-      const it=getLancamentosMes(m,ano).filter(l=>l.cartaoId===c.id);
+      const it=getLancamentosMes(m,ano).filter(l=>l.cartaoId===c.id || l.cartaoId===c.id);
       const total=it.reduce((s,l)=>s+parseFloat(l.valor||0),0);
       const byCat=getCatTotals(it);
       meses.push({m,total,byCat,items:it});
       totalAno+=total;
     }
+    // Total real: soma todas as parcelas do cartão em todos os meses
+    const totalParcelasCartao = state.lancamentos
+      .filter(l=>l.cartaoId===c.id && l.parcelado)
+      .reduce((s,l)=>s+parseFloat(l.valor||0)*(l.nParcelas||1),0);
+    const totalNaoParcelado = state.lancamentos
+      .filter(l=>l.cartaoId===c.id && !l.parcelado)
+      .reduce((s,l)=>s+parseFloat(l.valor||0),0);
 
     const mesMaior=meses.reduce((a,b)=>b.total>a.total?b:a);
     const mediaMensal=totalAno/12;
@@ -1281,6 +1289,7 @@ function renderAnaliseCartao() {
           <div style="text-align:right;">
             <div style="font-size:0.72rem;color:rgba(255,255,255,0.75);">Total ${ano}</div>
             <div style="font-size:1.4rem;font-weight:800;color:#fff;">${fmt(totalAno)}</div>
+            <div style="font-size:0.68rem;color:rgba(255,255,255,0.6);">parcelas futuras incluídas</div>
           </div>
         </div>
         <div style="padding:20px 24px;">
