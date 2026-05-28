@@ -146,6 +146,56 @@ const FINN_MSGS = [
   'O FinançasPro te mostra o caminho — você escolhe percorrê-lo. 🗺️',
   'Finanças não são sobre perfeição, são sobre progresso. 📈',
   'Você começou. Isso já é mais que a maioria faz. Parabéns! 🦉',
+  'Seu dinheiro precisa de direção, não de sorte. 🧭',
+  'Pequenos hábitos criam grandes patrimônios. 🌱',
+  'Controle hoje. Liberdade amanhã. 🔓',
+  'Cada real tem uma missão. 🎯',
+  'Organizar as finanças é cuidar da sua paz. 🕊️',
+  'O orçamento é o mapa da tranquilidade. 🗺️',
+  'Quem planeja, vive com mais leveza. 😌',
+  'Sua disciplina vale mais que sua renda. 💪',
+  'Prosperidade começa na organização. 🌟',
+  'Gastar menos é abrir espaço para sonhos. 💭',
+  'Seu futuro agradece cada escolha consciente. 🌅',
+  'Dinheiro bem cuidado trabalha por você. 💹',
+  'Toda conquista começa no planejamento. 🏆',
+  'Economia inteligente também é autocuidado. 💆',
+  'Liberdade financeira nasce das pequenas decisões. 🦋',
+  'O equilíbrio financeiro transforma vidas. ⚖️',
+  'Planejar é dar valor ao seu esforço. 🙌',
+  'Mais controle. Menos preocupação. 😊',
+  'Sua meta financeira começa agora. 🚀',
+  'Não é sobre ganhar mais. É sobre administrar melhor. 🧠',
+  'Organização financeira é poder silencioso. 💎',
+  'Quem controla os gastos controla o futuro. 🔑',
+  'Seu orçamento pode mudar sua história. 📖',
+  'Cada economia aproxima um objetivo. 🎯',
+  'Dinheiro consciente, vida equilibrada. ⚖️',
+  'Priorize sonhos, não impulsos. ✨',
+  'Crescimento financeiro é construção diária. 🏗️',
+  'Seu bolso merece atenção inteligente. 💡',
+  'Prosperar é um processo, não um acaso. 📈',
+  'O hábito de planejar vale ouro. 🥇',
+  'Mais clareza financeira, mais qualidade de vida. 🌈',
+  'Seu patrimônio começa nos detalhes. 🔍',
+  'Controle financeiro é liberdade em parcelas diárias. 🗓️',
+  'Faça o dinheiro seguir seus objetivos. 🎯',
+  'Organização hoje, estabilidade amanhã. 🏡',
+  'A disciplina financeira abre portas invisíveis. 🚪',
+  'Planejamento transforma metas em realidade. 🌟',
+  'Sua vida muda quando suas finanças mudam. 🦋',
+  'Dinheiro alinhado, mente tranquila. 🧘',
+  'Economizar é investir em você mesmo. 💚',
+  'Toda escolha financeira desenha seu futuro. ✏️',
+  'O sucesso financeiro começa no básico. 🧱',
+  'Inteligência financeira é uma habilidade de vida. 🎓',
+  'Menos desperdício. Mais propósito. 🌿',
+  'Cuidar do orçamento é cuidar da liberdade. 🕊️',
+  'Sua constância vale mais que a pressa. 🐢',
+  'Finanças organizadas geram oportunidades. 🚪',
+  'O controle financeiro fortalece sonhos. 💪',
+  'Seu futuro financeiro começa nas decisões de hoje. ⏰',
+  'Equilíbrio financeiro é qualidade de vida. 🌈',
 ];
 
 // ══════════════════════════════════════════════════
@@ -356,10 +406,44 @@ function nextMonth() {
   updateMonthLabel(); renderAll();
 }
 function getLancamentosMes(m=state.currentMonth, y=state.currentYear) {
-  return state.lancamentos.filter(l=>{
+  const diretos = state.lancamentos.filter(l=>{
     const d=new Date(l.data+'T12:00:00');
     return d.getMonth()===m && d.getFullYear()===y;
   });
+
+  // Gera parcelas futuras de lançamentos parcelados de outros meses
+  const parcelas = [];
+  state.lancamentos.forEach(l => {
+    if (!l.parcelado || !l.nParcelas || !l.parcelaAtual) return;
+    const dataBase = new Date(l.data+'T12:00:00');
+    const mesBase  = dataBase.getMonth();
+    const anoBase  = dataBase.getFullYear();
+    // Para cada parcela restante após a atual
+    for (let p = l.parcelaAtual + 1; p <= l.nParcelas; p++) {
+      const diffMeses = (p - l.parcelaAtual);
+      let mP = mesBase + diffMeses;
+      let yP = anoBase;
+      while (mP > 11) { mP -= 12; yP++; }
+      if (mP === m && yP === y) {
+        // Verifica se já existe lançamento desta parcela (evita duplicata)
+        const jaExiste = diretos.some(d =>
+          d.parcelado && d.parcelamentoOrigemId === l.id && d.parcelaAtual === p
+        );
+        if (!jaExiste) {
+          parcelas.push({
+            ...l,
+            id: l.id + '_p' + p,
+            parcelaAtual: p,
+            data: `${yP}-${String(mP+1).padStart(2,'0')}-${String(dataBase.getDate()).padStart(2,'0')}`,
+            parcelamentoOrigemId: l.id,
+            _gerado: true, // marcador — não salvar no Sheets
+          });
+        }
+      }
+    }
+  });
+
+  return [...diretos, ...parcelas];
 }
 function getLancamentosAno(y=state.currentYear) {
   return state.lancamentos.filter(l=>{
@@ -723,7 +807,16 @@ function saveLancamento() {
 }
 function editLancamento(id){const l=state.lancamentos.find(l=>l.id===id);if(l)openModal(l);}
 function deleteLancamento(id){
-  if(!confirm('Excluir este lançamento?'))return;
+  // Parcelas geradas automaticamente (_gerado) — excluir o lançamento origem
+  const idReal = id.includes('_p') ? id.split('_p')[0] + (id.includes('_p') ? '' : '') : id;
+  const lancamento = state.lancamentos.find(l => l.id === id || l.id === idReal);
+  if (!lancamento) return;
+  const isGerado = id.includes('_gerado') || lancamento._gerado;
+  if (isGerado) {
+    alert('Para excluir todas as parcelas, edite o lançamento original na aba Lançamentos.');
+    return;
+  }
+  if(!confirm('Excluir este lançamento?' + (lancamento.parcelado ? '\n\nAtenção: isso remove TODAS as parcelas.' : ''))) return;
   state.lancamentos=state.lancamentos.filter(l=>l.id!==id);
   saveLocal();
   sheetsPOST({ action:'deleteData', email:state.user.email, lancamentoId:id });
