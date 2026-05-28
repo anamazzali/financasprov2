@@ -1587,10 +1587,12 @@ function renderConfiguracoes() {
   const ultimo = localStorage.getItem('fp_ultimo_sync');
   const ultimoEl = $('configUltimoSync');
   if (ultimoEl && ultimo) ultimoEl.textContent = new Date(ultimo).toLocaleString('pt-BR');
-  // Limpar log ao abrir
+  // Só reseta status se nunca sincronizou
   const log = $('syncLog');
   if (log) { log.style.display = 'none'; log.innerHTML = ''; }
-  setSyncStatus('pendente');
+  const ultimoSync = localStorage.getItem('fp_ultimo_sync');
+  if (!ultimoSync) setSyncStatus('pendente');
+  else setSyncStatus('ok');
 }
 
 // ══════════════════════════════════════════════════
