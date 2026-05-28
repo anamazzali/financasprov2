@@ -762,7 +762,7 @@ h1,h2,h3,h4,h5 { font-family: 'Sora', sans-serif; font-weight: 700; }
 }
 .comece-dica span { font-size: 1.4rem; flex-shrink: 0; }
 .comece-dica strong { display: block; font-size: 0.9rem; color: var(--dourado-escuro); margin-bottom: 5px; }
-.comece-dica p { font-size: 0.84rem; color: var(--texto-medio); line-height: 1.65; }
+.comece-dica p { font-size: 0.84rem; color: var(--texto-escuro); line-height: 1.65; }
 
 /* ══════════════════════════════════════════════════
    CONFIGURAÇÕES
