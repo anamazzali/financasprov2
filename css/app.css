@@ -1,562 +1,1053 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-  <title>FinançasPro — App</title>
-  <meta name="theme-color" content="#1B4332" />
-  <link rel="manifest" href="manifest.json" />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦉</text></svg>" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <link rel="stylesheet" href="css/app.css" />
-</head>
-<body>
+/* ══════════════════════════════════════════════════
+   FinançasPro — App CSS v2.0
+   Paleta: PlanilhaProfissional.com
+══════════════════════════════════════════════════ */
 
-<!-- ══ LOGIN ══ -->
-<div id="loginScreen" class="login-screen">
-  <div class="login-bubble login-bubble-1"></div>
-  <div class="login-bubble login-bubble-2"></div>
-  <div class="login-bubble login-bubble-3"></div>
-  <div class="login-bubble login-bubble-4"></div>
-  <div class="login-card">
-    <div class="login-logo-wrap"><span class="login-owl">🦉</span></div>
-    <h1 class="login-title">FinançasPro</h1>
-    <p class="login-sub">Sistema Profissional de Controle Financeiro</p>
-    <div id="loginLoading" class="login-loading" style="display:none;">
-      <div class="spinner"></div><span>Verificando acesso...</span>
-    </div>
-    <div id="googleBtnWrap">
-      <div id="g_id_onload"
-        data-client_id="415111664058-jgshiqlt2qbidcd5frdrg59omjelkg2u.apps.googleusercontent.com"
-        data-callback="handleCredentialResponse"
-        data-auto_prompt="false"></div>
-      <div class="g_id_signin"
-        data-type="standard" data-size="large" data-theme="outline"
-        data-text="signin_with" data-shape="pill"
-        data-logo_alignment="left" data-width="320"></div>
-    </div>
-    <div id="accessDenied" class="access-denied" style="display:none;">
-      <span class="access-denied-icon">✕</span>
-      <span>E-mail não encontrado. <a href="https://go.hotmart.com/W105603611X" target="_blank">Adquira seu acesso aqui →</a></span>
-    </div>
-    <div class="login-info-list">
-      <div class="login-info-item"><span>🔒</span><span>Acesso restrito a e-mails previamente cadastrados</span></div>
-      <div class="login-info-item"><span>📱</span><span>Funciona em celular, tablet e computador</span></div>
-      <div class="login-info-item"><span>☁️</span><span>Dados sincronizados </span></div>
-    </div>
-    <a href="https://go.hotmart.com/W105603611X" target="_blank" class="login-buy-link">Ainda não tem acesso? Comprar agora →</a>
-  </div>
-</div>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-<!-- ══ APP PRINCIPAL ══ -->
-<!-- TRANSIÇÃO FINN -->
-<div id="finnTransition" class="finn-transition" style="display:none;">
-  <div class="finn-transition-inner">
-    <div class="finn-transition-owl">🦉</div>
-    <p id="finnTransitionMsg" class="finn-transition-msg"></p>
-    <div class="finn-transition-dots">
-      <span></span><span></span><span></span>
-    </div>
-  </div>
-</div>
+:root {
+  --verde-escuro:   #1B4332;
+  --verde-medio:    #2D6A4F;
+  --verde-claro:    #52B788;
+  --verde-accent:   #95D5B2;
+  --dourado:        #D4AF37;
+  --dourado-claro:  #F0CB5E;
+  --dourado-escuro: #A07820;
+  --bege:           #F5F0E8;
+  --bege-claro:     #FAF6EE;
+  --bege-escuro:    #E8DFC8;
+  --texto-escuro:   #1A1A2E;
+  --texto-medio:    #555555;
+  --vermelho:       #C0392B;
+  --verde-positivo: #1B7A3E;
 
-<div id="mainApp" style="display:none;">
+  --sidebar-w: 240px;
+  --topbar-h: 58px;
+  --radius: 12px;
+  --radius-lg: 18px;
+  --shadow-sm: 0 2px 8px rgba(27,67,50,0.1);
+  --shadow-md: 0 8px 24px rgba(27,67,50,0.12);
+  --shadow-lg: 0 20px 48px rgba(27,67,50,0.18);
+}
 
-  <!-- SIDEBAR -->
-  <aside id="sidebar" class="sidebar">
-    <div class="sidebar-header">
-      <span class="sidebar-owl">🦉</span>
-      <span class="sidebar-brand">FinançasPro</span>
-    </div>
-    <div id="userInfo" class="sidebar-user">
-      <img id="userAvatar" src="" alt="" class="user-avatar" />
-      <div class="user-details">
-        <div id="userName" class="user-name"></div>
-        <div id="userEmail" class="user-email"></div>
-      </div>
-    </div>
-    <nav class="sidebar-nav">
-      <div class="nav-group-label">Principal</div>
-      <button class="nav-item active" data-tab="dashboard"       onclick="switchTab('dashboard')">      <span class="nav-icon">📊</span> Dashboard</button>
-      <button class="nav-item"        data-tab="lancamentos"     onclick="switchTab('lancamentos')">    <span class="nav-icon">📝</span> Lançamentos</button>
-      <button class="nav-item"        data-tab="cartoes"         onclick="switchTab('cartoes')">        <span class="nav-icon">💳</span> Cartões</button>
+/* ══ FONTE GLOBAL ══ */
+html { font-size: 16px; }
+body {
+  font-family: 'Sora', sans-serif;
+  background: var(--bege-claro);
+  color: var(--texto-escuro);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+input, select, textarea, button { font-family: 'Sora', sans-serif; }
+h1,h2,h3,h4,h5 { font-family: 'Sora', sans-serif; font-weight: 700; }
 
-      <div class="nav-group-label">Análises</div>
-      <button class="nav-item"        data-tab="relatorios"      onclick="switchTab('relatorios')">     <span class="nav-icon">📈</span> Relatório Mensal</button>
-      <button class="nav-item"        data-tab="comparativo"     onclick="switchTab('comparativo')">    <span class="nav-icon">📅</span> Comparativo</button>
-      <button class="nav-item"        data-tab="dre"             onclick="switchTab('dre')">            <span class="nav-icon">📋</span> DRE</button>
-      <button class="nav-item"        data-tab="analise-cartao"  onclick="switchTab('analise-cartao')"> <span class="nav-icon">🔍</span> Análise Cartão</button>
-      <button class="nav-item"        data-tab="fluxo"           onclick="switchTab('fluxo')">           <span class="nav-icon">💰</span> Fluxo de Caixa</button>
+/* ══════════════════════════════════════════════════
+   LOGIN — estilo ManicurePro
+══════════════════════════════════════════════════ */
+.login-screen {
+  min-height: 100vh;
+  background: linear-gradient(135deg, var(--verde-escuro) 0%, #224d3c 40%, #1a5c42 70%, var(--verde-medio) 100%);
+  display: flex; align-items: center; justify-content: center;
+  position: relative; overflow: hidden;
+  padding: 20px;
+}
 
-      <div class="nav-group-label">Prosperidade</div>
-      <button class="nav-item"        data-tab="caixinhas"       onclick="switchTab('caixinhas')">      <span class="nav-icon">🏦</span> Método Caixinhas</button>
-      <button class="nav-item"        data-tab="sobre-caixinhas" onclick="switchTab('sobre-caixinhas')"><span class="nav-icon">📖</span> Como Funciona</button>
+/* Bolhas decorativas como no ManicurePro */
+.login-bubble {
+  position: absolute; border-radius: 50%;
+  background: rgba(255,255,255,0.05);
+  pointer-events: none;
+}
+.login-bubble-1 { width: 320px; height: 320px; top: -80px; left: -80px; }
+.login-bubble-2 { width: 200px; height: 200px; top: 10%;  right: 5%;  background: rgba(212,175,55,0.06); }
+.login-bubble-3 { width: 280px; height: 280px; bottom: -60px; right: -60px; }
+.login-bubble-4 { width: 160px; height: 160px; bottom: 20%; left: 8%;   background: rgba(82,183,136,0.07); }
 
-      <div class="nav-group-label">Sistema</div>
-      <button class="nav-item"        data-tab="comece"          onclick="switchTab('comece')">         <span class="nav-icon">🚀</span> Comece Aqui</button>
-      <button class="nav-item"        data-tab="configuracoes"   onclick="switchTab('configuracoes')">  <span class="nav-icon">⚙️</span> Configurações</button>
-      <button class="nav-item"        data-tab="termos"          onclick="switchTab('termos')">         <span class="nav-icon">📄</span> Termos de Uso</button>
-    </nav>
-    <div class="sidebar-footer">
-      <div class="sidebar-dev">Desenvolvido por<br/><a href="https://planilhaprofissional.com" target="_blank">planilhaprofissional.com</a></div>
-      <button class="nav-item nav-item-logout" onclick="logout()"><span class="nav-icon">🚪</span> Sair</button>
-    </div>
-  </aside>
+/* Card branco central — exatamente como ManicurePro */
+.login-card {
+  background: #fff;
+  border-radius: 24px;
+  padding: 44px 40px 36px;
+  width: 100%; max-width: 420px;
+  text-align: center;
+  position: relative; z-index: 1;
+  box-shadow: 0 32px 80px rgba(0,0,0,0.25), 0 0 0 1px rgba(255,255,255,0.1);
+}
 
-  <div id="sidebarOverlay" class="sidebar-overlay" onclick="closeSidebar()"></div>
+/* Logo owl */
+.login-logo-wrap {
+  width: 72px; height: 72px;
+  background: linear-gradient(135deg, var(--verde-escuro), var(--verde-medio));
+  border-radius: 20px;
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 18px;
+  box-shadow: var(--shadow-md);
+}
+.login-owl { font-size: 2.2rem; line-height: 1; }
 
-  <!-- MAIN -->
-  <main class="main-content">
-    <div class="topbar">
-      <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
-      <div class="topbar-title" id="topbarTitle">Dashboard</div>
-      <div class="topbar-month">
-        <button onclick="prevMonth()">‹</button>
-        <span id="monthLabel">Mai 2026</span>
-        <button onclick="nextMonth()">›</button>
-      </div>
-    </div>
+.login-title {
+  font-size: 1.7rem; font-weight: 800;
+  color: var(--texto-escuro); margin-bottom: 6px;
+  letter-spacing: -0.02em;
+}
+.login-sub {
+  font-size: 0.88rem; color: var(--texto-medio);
+  margin-bottom: 28px; line-height: 1.5;
+}
 
-    <div id="finn" class="finn-popup" style="display:none;">
-      <span class="finn-owl">🦉</span>
-      <p id="finnMsg"></p>
-      <button onclick="closeFinn()" class="finn-close">✕</button>
-    </div>
+/* Erro */
+.access-denied {
+  background: #fef2f2; border: 1px solid #fecaca;
+  border-radius: 10px; padding: 14px 16px;
+  margin-bottom: 20px;
+  display: flex; gap: 10px; align-items: flex-start; text-align: left;
+}
+.access-denied strong { display: block; font-size: 0.86rem; color: var(--vermelho); margin-bottom: 3px; }
+.access-denied p { font-size: 0.82rem; color: var(--texto-medio); line-height: 1.5; }
+.access-denied a { color: var(--verde-medio); font-weight: 600; text-decoration: none; }
 
-    <!-- DASHBOARD -->
-    <div id="tab-dashboard" class="tab-content">
-      <div class="cards-grid">
-        <div class="kpi-card kpi-receita"><div class="kpi-label">Receita Total</div><div class="kpi-val" id="totalReceita">R$ 0,00</div><div class="kpi-sub">este mês</div></div>
-        <div class="kpi-card kpi-despesa"><div class="kpi-label">Despesas</div><div class="kpi-val" id="totalDespesa">R$ 0,00</div><div class="kpi-sub">este mês</div></div>
-        <div class="kpi-card kpi-saldo"><div class="kpi-label">Saldo</div><div class="kpi-val" id="totalSaldo">R$ 0,00</div><div class="kpi-sub">receita − despesas</div></div>
-        <div class="kpi-card kpi-economia"><div class="kpi-label">Taxa de Economia</div><div class="kpi-val" id="taxaEconomia">0%</div><div class="kpi-sub">meta: 20%</div></div>
-      </div>
-      <div class="insights-grid">
-        <div class="insight-card"><div class="insight-label">🔴 Maior Gasto do Mês</div><div class="insight-val" id="maiorGasto">—</div></div>
-        <div class="insight-card"><div class="insight-label">💳 Total no Cartão de Crédito</div><div class="insight-val" id="gastoCartao">R$ 0,00</div></div>
-        <div class="insight-card"><div class="insight-label">💳 Principal Gasto no Cartão</div><div class="insight-val" id="principalCartao">—</div></div>
-        <div class="insight-card"><div class="insight-label">🏆 Categoria com Maior Gasto</div><div class="insight-val" id="maiorCategoria">—</div></div>
-      </div>
-      <div class="charts-row">
-        <div class="chart-box"><h3 class="chart-title">Despesas por Categoria</h3><div class="chart-wrap"><canvas id="chartCategoria"></canvas></div></div>
-        <div class="chart-box"><h3 class="chart-title">Últimos 6 Meses</h3><div class="chart-wrap"><canvas id="chartMensal"></canvas></div></div>
-      </div>
-      <div class="table-box"><h3 class="chart-title">Ranking de Categorias</h3>
-        <table class="data-table" id="tabelaCategorias">
-          <thead><tr><th>Categoria</th><th>Total</th><th>%</th></tr></thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </div>
+/* Loading */
+.login-loading {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  color: var(--texto-medio); font-size: 0.86rem;
+  margin: 16px 0;
+}
+.spinner {
+  width: 22px; height: 22px;
+  border: 3px solid var(--bege-escuro);
+  border-top-color: var(--verde-medio);
+  border-radius: 50%;
+  animation: spin .75s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
 
-    <!-- LANÇAMENTOS -->
-    <div id="tab-lancamentos" class="tab-content" style="display:none;">
-      <div class="tab-header">
-        <h2 class="tab-title">Lançamentos</h2>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <button class="btn-export" onclick="exportarCSV('lancamentos')" title="Exportar CSV">📥 CSV</button>
-          <button class="btn-add" onclick="openModal()">+ Novo Lançamento</button>
-        </div>
-      </div>
-      <div class="filter-bar">
-        <select id="filterTipo" onchange="renderLancamentos()">
-          <option value="">Todos os tipos</option>
-          <option value="despesa">Despesas</option>
-          <option value="receita">Receitas</option>
-        </select>
-        <select id="filterCategoria" onchange="renderLancamentos()"><option value="">Todas as categorias</option></select>
-      </div>
-      <div id="lancamentosLista" class="lancamentos-lista"></div>
-    </div>
+/* Botão Google — container centralizado */
+#googleBtnWrap {
+  display: flex; justify-content: center;
+  margin-bottom: 20px;
+}
 
-    <!-- CARTÕES -->
-    <div id="tab-cartoes" class="tab-content" style="display:none;">
-      <div class="tab-header">
-        <h2 class="tab-title">Cartões de Crédito</h2>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <button class="btn-export" onclick="exportarCSV('cartoes')" title="Exportar CSV cartões">📥 CSV</button>
-          <button class="btn-add" onclick="openCardModal()">+ Novo Cartão</button>
-        </div>
-      </div>
-      <div id="cartoesList" class="cartoes-grid"></div>
-    </div>
+/* Info list — como no ManicurePro */
+.login-info-list {
+  display: flex; flex-direction: column; gap: 8px;
+  margin-bottom: 20px;
+}
+.login-info-item {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 0.82rem; color: var(--texto-medio);
+  background: var(--bege-claro); border-radius: 8px;
+  padding: 8px 12px; text-align: left;
+}
+.login-info-item span:first-child { font-size: 0.95rem; flex-shrink: 0; }
 
-    <!-- RELATÓRIO -->
-    <div id="tab-relatorios" class="tab-content" style="display:none;">
-      <div class="tab-header">
-        <h2 class="tab-title">Relatório Mensal</h2>
-        <div class="export-btns">
-          <button class="btn-export" onclick="exportarCSV('lancamentos')" title="Exportar CSV">📥 CSV</button>
-         </div>
-      </div>
-      <div id="relatorioContent" class="relatorio-box"></div>
-    </div>
+.login-buy-link {
+  font-size: 0.8rem; color: var(--verde-medio);
+  text-decoration: none; font-weight: 600;
+  transition: color .2s;
+}
+.login-buy-link:hover { color: var(--verde-escuro); }
 
-    <!-- COMPARATIVO -->
-    <div id="tab-comparativo" class="tab-content" style="display:none;">
-      <div class="tab-header">
-        <h2 class="tab-title">Comparativo — Últimos 12 Meses</h2>
-        <div class="export-btns">
-          <button class="btn-export" onclick="exportarCSV('anual')" title="Exportar CSV anual">📥 CSV Anual</button>
-         
-        </div>
-      </div>
-      <div id="compSummary" class="comp-summary"></div>
-      <div class="chart-box" style="margin-bottom:20px;">
-        <h3 class="chart-title">📈 Evolução de Receitas, Despesas e Saldo</h3>
-        <div class="chart-wrap" style="max-height:280px;"><canvas id="chartComparativo"></canvas></div>
-      </div>
-      <div id="comparativoContent"></div>
-    </div>
+/* ══════════════════════════════════════════════════
+   LAYOUT PRINCIPAL
+══════════════════════════════════════════════════ */
+#mainApp { display: flex; min-height: 100vh; }
 
-    <!-- DRE -->
-    <div id="tab-dre" class="tab-content" style="display:none;">
-      <div class="tab-header"><h2 class="tab-title">DRE — Demonstrativo de Resultado</h2></div>
-      <div id="dreContent"></div>
-    </div>
+/* ── SIDEBAR ── */
+.sidebar {
+  width: var(--sidebar-w);
+  background: var(--verde-escuro);
+  display: flex; flex-direction: column;
+  position: fixed; top: 0; left: 0; height: 100vh;
+  z-index: 50; transition: transform .28s cubic-bezier(.4,0,.2,1);
+  border-right: 1px solid rgba(255,255,255,0.06);
+}
+.sidebar-header {
+  display: flex; align-items: center; gap: 9px;
+  padding: 20px 18px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  font-weight: 800; font-size: 1.08rem; color: #fff;
+  letter-spacing: -0.01em;
+}
+.sidebar-owl { font-size: 1.4rem; }
+.sidebar-brand { color: #fff; }
 
-    <!-- ANÁLISE CARTÃO -->
-    <div id="tab-analise-cartao" class="tab-content" style="display:none;">
-      <div class="tab-header"><h2 class="tab-title">Análise por Cartão</h2></div>
-      <div id="analiseCartaoContent"></div>
-    </div>
+.sidebar-user {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.user-avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  border: 2px solid var(--dourado); object-fit: cover; flex-shrink: 0;
+}
+.user-details { min-width: 0; }
+.user-name  { font-size: 0.83rem; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.user-email { font-size: 0.7rem;  color: var(--verde-accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    <!-- FLUXO DE CAIXA -->
-    <div id="tab-fluxo" class="tab-content" style="display:none;">
-      <div class="tab-header"><h2 class="tab-title">Fluxo de Caixa</h2></div>
-      <div id="fluxoContent"></div>
-    </div>
+.sidebar-nav { flex:1; padding: 10px; display: flex; flex-direction: column; gap: 3px; overflow-y: auto; }
+.sidebar-footer { padding: 10px; border-top: 1px solid rgba(255,255,255,0.08); }
 
-    <!-- CAIXINHAS -->
-    <div id="tab-caixinhas" class="tab-content" style="display:none;">
-      <div class="tab-header"><h2 class="tab-title">Método das Caixinhas</h2></div>
-      <div id="caixinhasContent"></div>
-    </div>
+.nav-item {
+  width: 100%; display: flex; align-items: center; gap: 9px;
+  padding: 10px 13px; border-radius: 9px;
+  background: none; border: none;
+  color: var(--verde-accent); font-family: 'Sora', sans-serif;
+  font-size: 0.87rem; font-weight: 500;
+  cursor: pointer; text-align: left; transition: all .18s;
+}
+.nav-item:hover { background: rgba(255,255,255,0.07); color: #fff; }
+.nav-item.active {
+  background: rgba(212,175,55,0.14);
+  color: var(--dourado); font-weight: 700;
+  border-left: 3px solid var(--dourado);
+}
+.nav-item-logout:hover { background: rgba(192,57,43,0.15); color: #ff9090; }
+.nav-icon { font-size: 1rem; flex-shrink: 0; }
 
-    <!-- SOBRE AS CAIXINHAS -->
-    <div id="tab-sobre-caixinhas" class="tab-content" style="display:none;">
-      <div class="tab-header"><h2 class="tab-title">📖 As 6 Caixinhas Explicadas</h2></div>
-      <div class="caixinhas-sobre-wrap">
-        <div class="caixinhas-sobre-intro">
-          <span class="caixinhas-sobre-intro-icon">🍰</span>
-          <div>
-            <h3>Imagine seu salário como um bolo</h3>
-            <p>Você vai fatiar este bolo em 6 porções específicas, cada uma com um destino claro. Nada entra em uma caixinha por acidente — tudo é planejado. Este método foi popularizado por T. Harv Eker e é utilizado por milhões de pessoas no mundo para alcançar a liberdade financeira.</p>
-          </div>
-        </div>
-        <div class="caixinhas-sobre-grid">
-          <div class="csobre-card" style="border-top-color:#C0392B;">
-            <div class="csobre-header"><div class="csobre-badge" style="background:rgba(192,57,43,0.1);color:#C0392B;">50%</div><div class="csobre-icon">🔴</div><div><div class="csobre-titulo">Caixinha 1 — Necessidades</div><div class="csobre-sub">O que é essencial para viver</div></div></div>
-            <div class="csobre-section"><div class="csobre-section-label csobre-ok">✅ O que entra</div><ul><li>Aluguel ou financiamento imobiliário</li><li>Condomínio e IPTU</li><li>Energia elétrica, água e gás</li><li>Supermercado básico</li><li>Transporte essencial</li><li>Plano de saúde e medicamentos essenciais</li></ul></div>
-            <div class="csobre-section"><div class="csobre-section-label csobre-nao">❌ O que NÃO entra</div><ul><li>Delivery e restaurantes</li><li>Uber quando há transporte público</li><li>Streaming (isso é lazer)</li><li>Roupas de marca</li></ul></div>
-            <div class="csobre-alerta">⚠️ Se suas necessidades ultrapassam 50%, há duas saídas: <strong>reduzir despesas</strong> ou <strong>aumentar renda</strong>.</div>
-          </div>
-          <div class="csobre-card" style="border-top-color:#1B7A3E;">
-            <div class="csobre-header"><div class="csobre-badge" style="background:rgba(27,122,62,0.1);color:#1B7A3E;">10%</div><div class="csobre-icon">🟢</div><div><div class="csobre-titulo">Caixinha 2 — Investimentos</div><div class="csobre-sub">Segurança e reserva de emergência</div></div></div>
-            <div class="csobre-section"><div class="csobre-section-label csobre-ok">✅ Destinos</div><ul><li>Reserva de Emergência (meta: 6 a 12 meses de despesas)</li><li>Fundo para imprevistos</li><li>Aposentadoria complementar</li></ul></div>
-            <div class="csobre-section"><div class="csobre-section-label" style="font-size:0.72rem;font-weight:700;color:var(--verde-medio);margin-bottom:6px;">🏦 Onde guardar</div><ul><li>Tesouro Selic</li><li>CDB de liquidez diária</li><li>Conta remunerada</li></ul></div>
-            <div class="csobre-dica">💡 Aqui a prioridade é <strong>segurança e liquidez</strong> — você precisa acessar rapidamente em caso de emergência.</div>
-          </div>
-          <div class="csobre-card" style="border-top-color:#A07820;">
-            <div class="csobre-header"><div class="csobre-badge" style="background:rgba(160,120,32,0.1);color:#A07820;">10%</div><div class="csobre-icon">🟠</div><div><div class="csobre-titulo">Caixinha 3 — Longo Prazo</div><div class="csobre-sub">A semente do seu patrimônio</div></div></div>
-            <div class="csobre-section"><div class="csobre-section-label csobre-ok">✅ Destinos</div><ul><li>Tesouro Direto (Selic, IPCA+, Prefixado)</li><li>CDBs de longo prazo</li><li>Ações e FIIs</li><li>Previdência Privada</li></ul></div>
-            <div class="csobre-alerta" style="background:rgba(160,120,32,0.08);border-color:rgba(160,120,32,0.3);">🔒 <strong>REGRA ABSOLUTA:</strong> Esta caixinha é <strong>INVIOLÁVEL</strong>. Não use para emergências — esta é a semente do seu patrimônio futuro.</div>
-          </div>
-          <div class="csobre-card" style="border-top-color:#820AD1;">
-            <div class="csobre-header"><div class="csobre-badge" style="background:rgba(130,10,209,0.08);color:#820AD1;">10%</div><div class="csobre-icon">🟣</div><div><div class="csobre-titulo">Caixinha 4 — Educação</div><div class="csobre-sub">O maior retorno sobre investimento</div></div></div>
-            <div class="csobre-section"><div class="csobre-section-label csobre-ok">✅ Destinos</div><ul><li>Cursos profissionalizantes</li><li>Livros e e-books</li><li>Mentorias e coaching</li><li>Certificações profissionais</li><li>Eventos de networking</li></ul></div>
-            <div class="csobre-dica" style="background:rgba(130,10,209,0.06);border-color:rgba(130,10,209,0.2);">📈 <strong>ROI:</strong> cada R$ 1 investido em educação retorna, em média, <strong>R$ 10 em oportunidades de renda</strong> ao longo da vida.</div>
-          </div>
-          <div class="csobre-card" style="border-top-color:#005CA9;">
-            <div class="csobre-header"><div class="csobre-badge" style="background:rgba(0,92,169,0.08);color:#005CA9;">10%</div><div class="csobre-icon">🔵</div><div><div class="csobre-titulo">Caixinha 5 — Lazer</div><div class="csobre-sub">Gaste sem culpa — é planejado!</div></div></div>
-            <div class="csobre-section"><div class="csobre-section-label csobre-ok">✅ O que entra</div><ul><li>Cinema e streaming</li><li>Restaurantes e delivery</li><li>Hobbies e esportes</li><li>Viagens curtas</li><li>Roupas não essenciais</li><li>Saídas com amigos</li></ul></div>
-            <div class="csobre-dica" style="background:rgba(0,92,169,0.06);border-color:rgba(0,92,169,0.2);">🧘 O lazer não é luxo — é <strong>necessidade para a saúde mental</strong>. Esta caixinha existe para você gastar SEM CULPA, mas de forma planejada.</div>
-          </div>
-          <div class="csobre-card" style="border-top-color:#D4AF37;">
-            <div class="csobre-header"><div class="csobre-badge" style="background:rgba(212,175,55,0.12);color:#A07820;">10%</div><div class="csobre-icon">💛</div><div><div class="csobre-titulo">Caixinha 6 — Doação</div><div class="csobre-sub">Mentalidade de abundância</div></div></div>
-            <div class="csobre-section"><div class="csobre-section-label csobre-ok">✅ Destinos</div><ul><li>Igreja e comunidades religiosas</li><li>ONGs e causas sociais</li><li>Ajuda a familiares necessitados</li><li>Projetos comunitários</li></ul></div>
-            <div class="csobre-dica" style="background:rgba(212,175,55,0.08);border-color:rgba(212,175,55,0.3);">❤️ <strong>Efeito psicológico:</strong> doar gera mentalidade de abundância. Se não tem causa específica, direcione para a caixinha de Longo Prazo.</div>
-          </div>
-        </div>
-        <div class="csobre-resumo">
-          <h3>📊 Resumo do Método</h3>
-          <div class="csobre-resumo-grid">
-            <div style="border-left:4px solid #C0392B;"><span>🔴 50%</span><strong>Necessidades</strong></div>
-            <div style="border-left:4px solid #1B7A3E;"><span>🟢 10%</span><strong>Investimentos</strong></div>
-            <div style="border-left:4px solid #A07820;"><span>🟠 10%</span><strong>Longo Prazo</strong></div>
-            <div style="border-left:4px solid #820AD1;"><span>🟣 10%</span><strong>Educação</strong></div>
-            <div style="border-left:4px solid #005CA9;"><span>🔵 10%</span><strong>Lazer</strong></div>
-            <div style="border-left:4px solid #D4AF37;"><span>💛 10%</span><strong>Doação</strong></div>
-          </div>
-          <p style="margin-top:16px;font-size:0.85rem;color:var(--texto-medio);text-align:center;">Use a aba <strong style="color:var(--verde-medio);">Método Caixinhas</strong> para acompanhar sua distribuição em tempo real.</p>
-        </div>
-      </div>
-    </div>
+/* Overlay mobile */
+.sidebar-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5); z-index: 45;
+}
 
-    <!-- COMECE AQUI -->
-    <div id="tab-comece" class="tab-content" style="display:none;">
-      <div class="tab-header"><h2 class="tab-title">🚀 Comece Aqui</h2></div>
-      <div class="comece-wrap">
-        <div class="comece-hero">
-          <div class="comece-hero-badge">🦉 Bem-vindo ao FinançasPro!</div>
-          <h2 class="comece-hero-title">Seu controle financeiro começa agora</h2>
-          <p class="comece-hero-sub">Sistema profissional de controle financeiro pessoal — dashboard visual, gráficos, cartões e relatórios automáticos.</p>
-          <div class="comece-hero-tags"><span>✅ Login com Google</span><span>🔒 Dados só seus</span><span>📱 Celular e PC</span><span>
-        </div>
-        <div class="comece-steps">
-          <div class="comece-step"><div class="comece-step-num">1</div><div class="comece-step-body"><h3>Adicione seus cartões de crédito</h3><p>Vá em <strong>Cartões</strong> e clique em "+ Novo Cartão". Selecione o banco na lista — a cor é aplicada automaticamente. Nubank fica roxo, Itaú laranja, Sicredi verde.</p></div></div>
-          <div class="comece-step"><div class="comece-step-num">2</div><div class="comece-step-body"><h3>Lance suas receitas do mês</h3><p>Vá em <strong>Lançamentos → + Novo Lançamento</strong>, selecione tipo "Receita" e informe seu salário. Isso ativa todas as análises do Dashboard e das Caixinhas.</p></div></div>
-          <div class="comece-step"><div class="comece-step-num">3</div><div class="comece-step-body"><h3>Registre suas despesas diariamente</h3><p>Para cada gasto, crie um lançamento tipo "Despesa" com a categoria correta — isso alimenta o gráfico, o DRE e o Método das Caixinhas.</p></div></div>
-          <div class="comece-step"><div class="comece-step-num">4</div><div class="comece-step-body"><h3>Configure o Método das Caixinhas</h3><p>Vá em <strong>Método Caixinhas</strong>, informe sua receita líquida e veja a distribuição automática 50/10/10/10/10/10. Leia a explicação em <strong>Como Funciona</strong>.</p></div></div>
-          <div class="comece-step"><div class="comece-step-num">5</div><div class="comece-step-body"><h3>Acompanhe o Fluxo de Caixa</h3><p>Em <strong>Fluxo de Caixa</strong> veja a movimentação diária e o saldo acumulado do mês, mais o resumo anual.</p></div></div>
-          <div class="comece-step"><div class="comece-step-num">6</div><div class="comece-step-body"><h3>Analise seus relatórios mensalmente</h3><p>Use <strong>Relatório Mensal</strong>, <strong>Comparativo</strong>, <strong>DRE</strong> e <strong>Análise por Cartão</strong> para entender seu padrão financeiro e tomar decisões melhores.</p></div></div>
-        </div>
-        <div class="comece-dica"><span>💡</span><div><strong style="color:var(--dourado-escuro);">Dica de Ouro</strong><p style="color:var(--texto-escuro);">Registre os lançamentos no mesmo dia. Quanto mais dados você inserir, mais precisas serão as análises. Consistência é a chave do sucesso!</p></div></div>
-      </div>
-    </div>
+/* ── MAIN ── */
+.main-content {
+  margin-left: var(--sidebar-w);
+  flex: 1; min-height: 100vh;
+  display: flex; flex-direction: column;
+  background: var(--bege-claro);
+}
 
-    <!-- CONFIGURAÇÕES -->
-    <div id="tab-configuracoes" class="tab-content" style="display:none;">
-      <div class="tab-header"><h2 class="tab-title">⚙️ Configurações</h2></div>
-      <div class="config-wrap">
-        <div class="config-section"><h3 class="config-title">👤 Minha Conta</h3>
-          <div class="config-row"><span class="config-label">E-mail</span><span id="configEmail" class="config-val">—</span></div>
-          <div class="config-row"><span class="config-label">Nome</span><span id="configNome" class="config-val">—</span></div>
-          <div class="config-row"><span class="config-label">Plano</span><span class="config-val" style="color:var(--dourado-escuro);font-weight:700;">FinançasPro Licensed</span></div>
-        </div>
-        <div class="config-section"><h3 class="config-title">🦉 Mascote Finn</h3>
-          <div class="config-row"><span class="config-label">Mensagens motivacionais</span><label class="config-toggle"><input type="checkbox" id="toggleFinn" checked onchange="salvarConfig()" /><span class="toggle-slider"></span></label></div>
-          <div class="config-row"><span class="config-label">Testar mensagem</span><button class="btn-config-action" onclick="showFinnTransition()">Ver Finn agora 🦉</button></div>
-        </div>
-        <div class="config-section"><h3 class="config-title">🔄 Sincronização com Google Sheets</h3>
-          <div class="config-row"><span class="config-label">Status da conexão</span><span id="configSyncStatus" class="config-val config-status-badge">⏳ Não verificado</span></div>
-          <div class="config-row"><span class="config-label">Último sync</span><span id="configUltimoSync" class="config-val">—</span></div>
-          <div class="config-row"><span class="config-label">Testar conexão</span><button class="btn-config-action" onclick="testarConexao()">Testar conexão 🔌</button></div>
-          <div class="config-row"><span class="config-label">Sincronizar (baixar do Sheets)</span><button class="btn-config-action" onclick="sincronizarAgora()">Sincronizar ↓ 🔄</button></div>
-          <div class="config-row"><span class="config-label">Enviar dados locais para Sheets</span><button class="btn-config-action" onclick="enviarParaSheets()">Enviar ↑ ☁️</button></div>
-          <div id="syncLog" class="sync-log" style="display:none;"></div>
-        </div>
-        <div class="config-section"><h3 class="config-title">💾 Dados</h3>
-          <div class="config-row"><span class="config-label">Total de lançamentos</span><span id="configTotalLanc" class="config-val">—</span></div>
-          <div class="config-row"><span class="config-label">Total de cartões</span><span id="configTotalCartoes" class="config-val">—</span></div>
-          <div class="config-row"><span class="config-label">Exportar dados locais</span><button class="btn-config-action" onclick="exportarDados()">Baixar JSON 💾</button></div>
-          <div class="config-row" style="border-top:2px solid var(--bege-escuro);margin-top:8px;padding-top:16px;"><span class="config-label" style="color:var(--vermelho);">Limpar dados locais</span><button class="btn-config-danger" onclick="limparDados()">Limpar ⚠️</button></div>
-        </div>
-        <div class="config-section"><h3 class="config-title">ℹ️ Sobre</h3>
-          <div class="config-row"><span class="config-label">Versão</span><span class="config-val">FinançasPro v2.0</span></div>
-          <div class="config-row"><span class="config-label">Desenvolvido por</span><a href="https://planilhaprofissional.com" target="_blank" class="config-link">planilhaprofissional.com</a></div>
-          <div class="config-row"><span class="config-label">Suporte WhatsApp</span><a href="https://wa.me/5566992388026" target="_blank" class="config-link">+55 66 99238-8026</a></div>
-          <div class="config-row"><span class="config-label">Hotmart</span><a href="https://go.hotmart.com/W105603611X" target="_blank" class="config-link">go.hotmart.com/W105603611X</a></div>
-        </div>
-      </div>
-      <div class="config-wrap">
-        <div class="config-section"><h3 class="config-title">👤 Minha Conta</h3>
-          <div class="config-row"><span class="config-label">E-mail</span><span id="configEmail" class="config-val">—</spaid="tab-termos" class="tab-content" style="display:none;">
-      <div class="tab-header"><h2 class="tab-title">📄 Termos de Uso e Privacidade</h2></div>
-      <div class="termos-wrap">
-        <div class="termos-box">
-          <h3>📋 Termos de Uso — FinançasPro v2.0</h3>
-          <h4>1. LICENÇA DE USO</h4><p>O FinançasPro é disponibilizado sob <strong>licença pessoal, não exclusiva e intransferível</strong>. O acesso é vinculado ao e-mail cadastrado e não pode ser compartilhado sob nenhuma circunstância.</p>
-          <h4>2. USO PERMITIDO</h4><ul><li>✅ Uso pessoal para controle financeiro próprio</li><li>✅ Registro de receitas, despesas e lançamentos</li><li>✅ Geração e análise de relatórios para uso próprio</li><li>✅ Acesso de múltiplos dispositivos com o mesmo e-mail</li></ul>
-          <h4>3. USO EXPRESSAMENTE PROIBIDO</h4><ul><li>❌ Revenda, sublicenciamento ou transferência do acesso</li><li>❌ Uso comercial para prestar serviços de gestão a outros</li><li>❌ Compartilhamento de credenciais de acesso</li><li>❌ Engenharia reversa ou modificação do código-fonte</li><li>❌ Uso para fins ilegais ou que violem a legislação brasileira</li></ul>
-          <h4>4. PRIVACIDADE E PROTEÇÃO DE DADOS (LGPD)</h4><p>Os dados financeiros são armazenados no app do próprio usuário. O desenvolvedor não tem acesso ao conteúdo financeiro. Dados de acesso são registrados apenas para segurança e suporte, conforme a Lei 13.709/2018.</p>
-          <h4>5. NÃO EXCLUSIVIDADE</h4><p>A licença concedida é <strong>não exclusiva</strong>. O desenvolvedor pode comercializar o FinançasPro para outros usuários sem que isso gere qualquer direito ou compensação ao licenciado.</p>
-          <h4>6. RESPONSABILIDADE E LIMITAÇÕES</h4><p>O sistema é fornecido "no estado em que se encontra", sem garantia de disponibilidade ininterrupta. O desenvolvedor não se responsabiliza por perdas decorrentes do uso ou perda de dados. Recomenda-se realizar backups regulares.</p>
-          <h4>7. SANÇÕES POR VIOLAÇÃO</h4><p>O descumprimento resultará em <strong>bloqueio imediato e permanente do acesso</strong>, sem direito a reembolso, nos termos do Marco Civil da Internet (Lei 12.965/2014) e da Lei de Direitos Autorais (Lei 9.610/1998).</p>
-          <h4>8. SUPORTE E CONTATO</h4><p>Para suporte: <a href="https://planilhaprofissional.com" target="_blank">planilhaprofissional.com</a> ou <a href="https://wa.me/5566992388026" target="_blank">WhatsApp +55 66 99238-8026</a>.</p>
-          <div class="termos-footer">Ao utilizar o FinançasPro, você declara ter lido e concordado com estes termos.<br/>Última atualização: Maio/2026 · <a href="https://planilhaprofissional.com" target="_blank">Planilha Profissional</a></div>
-        </div>
-      </div>
-    nfig-row"><span class="config-label">Plano</span><span class="config-val" style="color:var(--dourado-escuro);font-weight:700;">FinançasPro Licensed</span></div>
-        </div>
-        <div class="config-section"><h3 class="config-title">🦉 Mascote Finn</h3>
-          <div class="config-row"><span class="config-label">Mensagens motivacionais</span><label class="config-toggle"><input type="checkbox" id="toggleFinn" checked onchange="salvarConfig()" /><span class="toggle-slider"></span></label></div>
-          <div class="config-row"><span class="config-label">Testar mensagem</span><button class="btn-config-action" onclick="showFinnTransition()">Ver Finn agora 🦉</button></div>
-        </div>
-        <div class="config-section"><h3 class="config-title">💾 Dados</h3>
-          <div class="config-row"><span class="config-label">Total de lançamentos</span><span id="configTotalLanc" class="config-val">—</span></div>
-          <div class="config-row"><span class="config-label">Total de cartões</span><span id="configTotalCartoes" class="config-val">—</span></div>
-          <div class="config-row"><span class="config-label">Exportar dados locais</span><button class="btn-config-action" onclick="exportarDados()">Baixar JSON 💾</button></div>
-          <div class="config-row" style="border-top:2px solid var(--bege-escuro);margin-top:8px;padding-top:16px;"><span class="config-label" style="color:var(--vermelho);">Limpar dados locais</span><button class="btn-config-danger" onclick="limparDados()">Limpar ⚠️</button></div>
-        </div>
-        <div class="config-section"><h3 class="config-title">🔄 Sincronização </h3>
-          <div class="config-row">
-            <span class="config-label">Status da conexão</span>
-            <span id="configSyncStatus" class="config-val config-status-badge">⏳ Não verificado</span>
-          </div>
-          <div class="config-row">
-            <span class="config-label">Último sync</span>
-            <span id="configUltimoSync" class="config-val">—</span>
-          </div>
-          <div class="config-row">
-            <span class="config-label">Testar conexão com Sheets</span>
-            <button class="btn-config-action" onclick="testarConexao()">Testar conexão 🔌</button>
-          </div>
-          <div class="config-row">
-            <span class="config-label">Sincronizar agora (baixar do Sheets)</span>
-            <button class="btn-config-action" onclick="sincronizarAgora()">Sincronizar ↓ 🔄</button>
-          </div>
-          <div class="config-row">
-            <span class="config-label">Enviar dados locais para Sheets</span>
-            <button class="btn-config-action" onclick="enviarParaSheets()">Enviar ↑ ☁️</button>
-          </div>
-          <div id="syncLog" class="sync-log" style="display:none;"></div>
-        </div>
+/* TOP BAR */
+.topbar {
+  background: #fff; border-bottom: 1px solid var(--bege-escuro);
+  padding: 0 24px;
+  height: var(--topbar-h);
+  display: flex; align-items: center; gap: 14px;
+  position: sticky; top: 0; z-index: 40;
+  box-shadow: var(--shadow-sm);
+}
+.menu-toggle {
+  display: none; background: none; border: none;
+  color: var(--texto-escuro); font-size: 1.3rem; cursor: pointer; padding: 4px;
+}
+.topbar-title { font-weight: 700; font-size: 1rem; flex:1; color: var(--texto-escuro); }
+.topbar-month {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--bege); border: 1px solid var(--bege-escuro);
+  border-radius: 50px; padding: 6px 16px;
+}
+.topbar-month button {
+  background: none; border: none; color: var(--texto-medio);
+  font-size: 1.1rem; cursor: pointer; padding: 0 3px;
+  transition: color .18s; line-height: 1;
+}
+.topbar-month button:hover { color: var(--verde-medio); }
+.topbar-month span { font-size: 0.86rem; font-weight: 700; min-width: 72px; text-align: center; color: var(--texto-escuro); }
 
-        <div class="config-section"><h3 class="config-title">ℹ️ Sobre</h3>
-          <div class="config-row"><span class="config-label">Versão</span><span class="config-val">FinançasPro v2.0</span></div>
-          <div class="config-row"><span class="config-label">Desenvolvido por</span><a href="https://planilhaprofissional.com" target="_blank" class="config-link">planilhaprofissional.com</a></div>
-          <div class="config-row"><span class="config-label">Suporte WhatsApp</span><a href="https://wa.me/5566992388026" target="_blank" class="config-link">+55 66 99238-8026</a></div>
-          <div class="config-row"><span class="config-label">Hotmart</span><a href="https://go.hotmart.com/W105603611X" target="_blank" class="config-link">go.hotmart.com/W105603611X</a></div>
-        </div>
-      </div>
-    </div>
+/* FINN */
+.finn-popup {
+  position: fixed; bottom: 24px; right: 24px;
+  background: #fff; border: 2px solid var(--dourado);
+  border-radius: 16px; padding: 14px 18px;
+  display: flex; align-items: center; gap: 10px;
+  max-width: 270px; z-index: 999;
+  box-shadow: 0 8px 28px rgba(27,67,50,0.18);
+  animation: slideUp .3s ease;
+}
+@keyframes slideUp { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
+.finn-owl  { font-size: 1.6rem; flex-shrink:0; }
+.finn-popup p  { font-size: 0.8rem; color: var(--texto-medio); line-height: 1.5; flex:1; }
+.finn-close { background: none; border: none; color: var(--texto-medio); cursor: pointer; font-size: 0.8rem; transition: color .18s; flex-shrink:0; }
+.finn-close:hover { color: var(--vermelho); }
 
-    <!-- TERMOS DE USO -->
-    <div id="tab-termos" class="tab-content" style="display:none;">
-      <div class="tab-header"><h2 class="tab-title">📄 Termos de Uso e Privacidade</h2></div>
-      <div class="termos-wrap">
-        <div class="termos-box">
-          <h3>📋 Termos de Uso — FinançasPro v2.0</h3>
-          <h4>1. LICENÇA DE USO</h4><p>O FinançasPro é disponibilizado sob <strong>licença pessoal, não exclusiva e intransferível</strong>. O acesso é vinculado ao e-mail cadastrado e não pode ser compartilhado sob nenhuma circunstância.</p>
-          <h4>2. USO PERMITIDO</h4><ul><li>✅ Uso pessoal para controle financeiro próprio</li><li>✅ Registro de receitas, despesas e lançamentos</li><li>✅ Geração e análise de relatórios para uso próprio</li><li>✅ Acesso de múltiplos dispositivos com o mesmo e-mail</li></ul>
-          <h4>3. USO EXPRESSAMENTE PROIBIDO</h4><ul><li>❌ Revenda, sublicenciamento ou transferência do acesso</li><li>❌ Uso comercial para prestar serviços de gestão a outros</li><li>❌ Compartilhamento de credenciais de acesso</li><li>❌ Engenharia reversa ou modificação do código-fonte</li><li>❌ Uso para fins ilegais ou que violem a legislação brasileira</li></ul>
-          <h4>4. PRIVACIDADE E PROTEÇÃO DE DADOS (LGPD)</h4><p>Os dados financeiros são armazenados no app do próprio usuário. O desenvolvedor não tem acesso ao conteúdo financeiro. Dados de acesso são registrados apenas para segurança e suporte, conforme a Lei 13.709/2018.</p>
-          <h4>5. NÃO EXCLUSIVIDADE</h4><p>A licença concedida é <strong>não exclusiva</strong>. O desenvolvedor pode comercializar o FinançasPro para outros usuários sem que isso gere qualquer direito ou compensação ao licenciado.</p>
-          <h4>6. RESPONSABILIDADE E LIMITAÇÕES</h4><p>O sistema é fornecido "no estado em que se encontra", sem garantia de disponibilidade ininterrupta. O desenvolvedor não se responsabiliza por perdas decorrentes do uso ou perda de dados. Recomenda-se realizar backups regulares.</p>
-          <h4>7. SANÇÕES POR VIOLAÇÃO</h4><p>O descumprimento resultará em <strong>bloqueio imediato e permanente do acesso</strong>, sem direito a reembolso, nos termos do Marco Civil da Internet (Lei 12.965/2014) e da Lei de Direitos Autorais (Lei 9.610/1998).</p>
-          <h4>8. SUPORTE E CONTATO</h4><p>Para suporte: <a href="https://planilhaprofissional.com" target="_blank">planilhaprofissional.com</a> ou <a href="https://wa.me/5566992388026" target="_blank">WhatsApp +55 66 99238-8026</a>.</p>
-          <div class="termos-footer">Ao utilizar o FinançasPro, você declara ter lido e concordado com estes termos.<br/>Última atualização: Maio/2026 · <a href="https://planilhaprofissional.com" target="_blank">Planilha Profissional</a></div>
-        </div>
-      </div>
-    </div>
+/* TABS */
+.tab-content { padding: 24px; flex:1; }
 
-    <!-- RODAPÉ -->
-    <div class="app-footer">
-      Desenvolvido por <a href="https://planilhaprofissional.com" target="_blank">planilhaprofissional.com</a> · FinançasPro v2.0
-    </div>
-  </main>
-</div>
+/* ── KPI CARDS ── */
+.cards-grid {
+  display: grid; grid-template-columns: repeat(4,1fr);
+  gap: 14px; margin-bottom: 16px;
+}
+@media(max-width:1100px){ .cards-grid{ grid-template-columns:repeat(2,1fr); } }
+@media(max-width:560px) { .cards-grid{ grid-template-columns:1fr; } }
 
-<!-- MODAL LANÇAMENTO -->
-<div id="modal" class="modal-overlay" style="display:none;">
-  <div class="modal">
-    <div class="modal-header"><h3 id="modalTitle">Novo Lançamento</h3><button onclick="closeModal()" class="modal-close">✕</button></div>
-    <div class="modal-body">
-      <div class="form-row"><label>Tipo</label><select id="fTipo" onchange="updateCategorias()"><option value="despesa">Despesa</option><option value="receita">Receita</option></select></div>
-      <div class="form-row"><label>Descrição</label><input type="text" id="fDesc" placeholder="Ex: Aluguel, Salário..." /></div>
-      <div class="form-row"><label>Valor (R$)</label><input type="number" id="fValor" step="0.01" min="0" placeholder="0,00" /></div>
-      <div class="form-row"><label>Categoria</label><select id="fCategoria"></select></div>
-      <div class="form-row"><label>Data</label><input type="date" id="fData" /></div>
-      <div class="form-row">
-        <label>Forma de Pagamento</label>
-        <select id="fPagamento" onchange="toggleCartaoRow()">
-          <option>💳 Cartão de Crédito</option>
-          <option>💳 Cartão de Débito</option>
-          <option>🏦 PIX</option>
-          <option>🔄 Transferência</option>
-          <option>📄 Boleto</option>
-          <option>💵 Dinheiro/Espécie</option>
-          <option>🏧 Depósito</option>
-          <option>🍽️ Vale Alimentação/Refeição</option>
-          <option>🚌 Vale Transporte</option>
-        </select>
-      </div>
-      <div class="form-row" id="cartaoRow" style="display:none;"><label>Cartão</label><select id="fCartao"></select></div>
+.kpi-card {
+  background: #fff; border-radius: var(--radius);
+  padding: 18px 18px 14px;
+  border: 1px solid var(--bege-escuro);
+  border-left: 4px solid var(--bege-escuro);
+  box-shadow: var(--shadow-sm);
+  transition: transform .2s, box-shadow .2s;
+}
+.kpi-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.kpi-receita  { border-left-color: var(--verde-positivo); }
+.kpi-despesa  { border-left-color: var(--vermelho); }
+.kpi-saldo    { border-left-color: var(--verde-medio); }
+.kpi-economia { border-left-color: var(--dourado); }
+.kpi-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--texto-medio); margin-bottom: 8px; }
+.kpi-val   { font-size: 1.45rem; font-weight: 800; margin-bottom: 4px; color: var(--texto-escuro); }
+.kpi-receita .kpi-val  { color: var(--verde-positivo); }
+.kpi-despesa .kpi-val  { color: var(--vermelho); }
+.kpi-saldo .kpi-val    { color: var(--verde-medio); }
+.kpi-economia .kpi-val { color: var(--dourado-escuro); }
+.kpi-sub   { font-size: 0.73rem; color: var(--texto-medio); }
 
-      <!-- PARCELAMENTO -->
-      <div id="parcelamentoRow" style="display:none;">
-        <div class="form-row form-row-check" style="margin-bottom:8px;">
-          <label class="check-label">
-            <input type="checkbox" id="fParcelado" onchange="toggleParcelamento()" />
-            <span>Compra parcelada</span>
-          </label>
-        </div>
-        <div id="parcelamentoCampos" style="display:none;">
-          <div class="parcelamento-box">
-            <div class="form-row">
-              <label>Valor total da compra (R$)</label>
-              <input type="number" id="fValorTotal" step="0.01" min="0" placeholder="0,00" oninput="calcularParcelamento()" />
-            </div>
-            <div class="form-row-inline">
-              <div class="form-row">
-                <label>Nº de parcelas</label>
-                <input type="number" id="fParcelas" min="2" max="48" placeholder="12" oninput="calcularParcelamento()" />
-              </div>
-              <div class="form-row">
-                <label>Parcela atual</label>
-                <input type="number" id="fParcelaAtual" min="1" max="48" placeholder="1" oninput="calcularParcelamento()" />
-              </div>
-            </div>
-            <div class="form-row">
-              <label>Juros em R$ (total pago a mais)</label>
-              <input type="number" id="fJurosReais" step="0.01" min="0" placeholder="0,00" oninput="calcularParcelamento()" />
-            </div>
-            <div id="parcelamentoPreview" class="parcelamento-preview" style="display:none;">
-              <!-- preenchido pelo JS -->
-            </div>
-          </div>
-        </div>
-      </div>
+/* INSIGHTS */
+.insights-grid {
+  display: grid; grid-template-columns: repeat(4,1fr);
+  gap: 14px; margin-bottom: 20px;
+}
+@media(max-width:1100px){ .insights-grid{ grid-template-columns:repeat(2,1fr); } }
+.insight-card {
+  background: #fff; border: 1px solid var(--bege-escuro);
+  border-radius: var(--radius); padding: 14px 16px;
+  box-shadow: var(--shadow-sm);
+}
+.insight-label { font-size: 0.72rem; color: var(--texto-medio); margin-bottom: 7px; }
+.insight-val   { font-size: 0.95rem; font-weight: 700; color: var(--texto-escuro); }
 
-      <div class="form-row"><label>Observação</label><input type="text" id="fObs" placeholder="Opcional..." /></div>
-      <div class="form-row form-row-check"><label class="check-label"><input type="checkbox" id="fRecorrente" /><span>Lançamento recorrente (repete todo mês)</span></label></div>
-    </div>
-    <div class="modal-footer"><button class="btn-cancel" onclick="closeModal()">Cancelar</button><button class="btn-save" onclick="saveLancamento()">Salvar</button></div>
-  </div>
-</div>
+/* CHARTS */
+.charts-row {
+  display: grid; grid-template-columns: 5fr 7fr;
+  gap: 16px; margin-bottom: 18px;
+}
+@media(max-width:900px){ .charts-row{ grid-template-columns:1fr; } }
+.chart-box, .table-box {
+  background: #fff; border: 1px solid var(--bege-escuro);
+  border-radius: var(--radius); padding: 18px;
+  box-shadow: var(--shadow-sm);
+}
+.chart-title {
+  font-size: 0.78rem; font-weight: 800; text-transform: uppercase;
+  letter-spacing: 0.07em; color: var(--texto-medio);
+  margin-bottom: 14px;
+}
+.chart-wrap { position: relative; max-height: 240px; }
 
-<!-- MODAL CARTÃO -->
-<div id="cardModal" class="modal-overlay" style="display:none;">
-  <div class="modal">
-    <div class="modal-header"><h3>Novo Cartão de Crédito</h3><button onclick="closeCardModal()" class="modal-close">✕</button></div>
-    <div class="modal-body">
+/* TABLE */
+.data-table { width: 100%; border-collapse: collapse; font-size: 0.87rem; }
+.data-table th { padding: 9px 11px; color: var(--texto-medio); text-align: left; font-weight: 700; font-size: 0.73rem; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 2px solid var(--bege-escuro); }
+.data-table td { padding: 9px 11px; border-bottom: 1px solid var(--bege); }
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tr:hover td { background: var(--bege-claro); }
 
-      <div class="form-row">
-        <label>Banco / Bandeira</label>
-        <div class="banco-grid" id="bancoGrid">
-          <!-- gerado pelo JS -->
-        </div>
-      </div>
+/* ── LANÇAMENTOS ── */
+.tab-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+.tab-title  { font-size: 1.15rem; font-weight: 700; color: var(--texto-escuro); }
 
-      <div class="form-row"><label>Nome personalizado (opcional)</label><input type="text" id="cNome" placeholder="Ex: Nubank Pessoa Física, Itaú Gold..." oninput="atualizarPreview()" /></div>
-      <div class="form-row"><label>Limite (R$)</label><input type="number" id="cLimite" step="0.01" placeholder="5000" oninput="atualizarPreview()" /></div>
-      <div class="form-row"><label>Dia de Fechamento</label><input type="number" id="cFechamento" min="1" max="31" placeholder="15" /></div>
-      <div class="form-row"><label>Dia de Vencimento</label><input type="number" id="cVencimento" min="1" max="31" placeholder="22" /></div>
+.btn-add {
+  background: var(--verde-medio); color: #fff; border: none;
+  border-radius: 50px; padding: 9px 20px;
+  font-family: 'Sora', sans-serif; font-size: 0.85rem; font-weight: 700;
+  cursor: pointer; transition: all .2s;
+  box-shadow: 0 4px 12px rgba(45,106,79,0.25);
+}
+.btn-add:hover { background: var(--verde-escuro); transform: translateY(-1px); }
 
-      <!-- Preview da cor -->
-      <div class="form-row">
-        <label>Preview</label>
-        <div id="cardPreview" class="card-preview">
-          <div id="cardPreviewName">Selecione o banco acima</div>
-          <div id="cardPreviewLimit">Limite: R$ 0,00</div>
-        </div>
-      </div>
+.filter-bar { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
+.filter-bar select {
+  background: #fff; border: 1px solid var(--bege-escuro);
+  color: var(--texto-escuro); border-radius: 8px;
+  padding: 8px 14px; font-family: 'Sora', sans-serif;
+  font-size: 0.84rem; cursor: pointer; transition: border-color .2s;
+}
+.filter-bar select:focus { outline: none; border-color: var(--verde-medio); }
 
-      <div class="form-row form-row-check">
-        <label class="check-label"><input type="checkbox" id="cCorCustom" onchange="toggleCorCustom()" /><span>Usar cor personalizada</span></label>
-      </div>
-      <div class="form-row" id="cCorRow" style="display:none;"><label>Cor personalizada</label><input type="color" id="cCor" value="#2D6A4F" oninput="atualizarPreview()" /></div>
+.lancamentos-lista { display: flex; flex-direction: column; gap: 8px; }
+.lancamento-item {
+  background: #fff; border: 1px solid var(--bege-escuro);
+  border-radius: var(--radius); padding: 13px 16px;
+  display: flex; align-items: center; gap: 12px;
+  transition: border-color .2s, box-shadow .2s;
+  box-shadow: var(--shadow-sm);
+}
+.lancamento-item:hover { border-color: var(--verde-claro); box-shadow: var(--shadow-md); }
+.lanc-icon {
+  width: 38px; height: 38px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.1rem; flex-shrink: 0;
+}
+.lanc-icon.receita { background: rgba(27,122,62,0.1); }
+.lanc-icon.despesa { background: rgba(192,57,43,0.08); }
+.lanc-info { flex:1; min-width: 0; }
+.lanc-desc { font-weight: 600; font-size: 0.88rem; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--texto-escuro); }
+.lanc-meta { font-size: 0.73rem; color: var(--texto-medio); display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.lanc-badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  background: var(--bege); border-radius: 50px;
+  padding: 2px 8px; font-size: 0.69rem; color: var(--texto-medio);
+}
+.lanc-badge.recorrente { background: rgba(45,106,79,0.1); color: var(--verde-medio); font-weight: 600; }
+.lanc-val { font-weight: 800; font-size: 0.98rem; flex-shrink: 0; }
+.lanc-val.receita { color: var(--verde-positivo); }
+.lanc-val.despesa { color: var(--vermelho); }
+.lanc-actions { display: flex; gap: 4px; }
+.btn-icon {
+  background: none; border: none; cursor: pointer;
+  color: var(--texto-medio); font-size: 0.88rem; padding: 5px;
+  border-radius: 6px; transition: all .18s;
+}
+.btn-icon:hover { color: var(--vermelho); background: rgba(192,57,43,0.08); }
 
-    </div>
-    <div class="modal-footer"><button class="btn-cancel" onclick="closeCardModal()">Cancelar</button><button class="btn-save" onclick="saveCard()">Salvar</button></div>
-  </div>
-</div>
+/* ── CARTÕES ── */
+.cartoes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px,1fr)); gap: 18px; }
+.cartao-card {
+  border-radius: 18px; padding: 22px;
+  color: #fff; position: relative; overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+.cartao-nome   { font-size: 1.05rem; font-weight: 700; margin-bottom: 4px; }
+.cartao-limite { font-size: 0.76rem; opacity: 0.75; margin-bottom: 18px; }
+.cartao-fatura { font-size: 0.76rem; opacity: 0.7; margin-bottom: 6px; }
+.cartao-gasto  { font-size: 1.6rem; font-weight: 800; margin-bottom: 10px; }
+.cartao-bar-track { height: 6px; background: rgba(255,255,255,0.2); border-radius: 50px; overflow: hidden; margin-bottom: 6px; }
+.cartao-bar-fill  { height: 100%; border-radius: 50px; background: rgba(255,255,255,0.85); transition: width .4s; }
+.cartao-footer { display: flex; justify-content: space-between; align-items: center; font-size: 0.7rem; opacity: 0.75; }
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script>if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});</script>
-<script>
-  // Captura erros globais para debug
-  window.onerror = function(msg, src, line, col, err) {
-    console.error('FinancasPro Error:', msg, 'linha:', line, err);
-    return false;
-  };
-  window.onunhandledrejection = function(e) {
-    console.error('Promise Error:', e.reason);
-  };
-</script>
-<script src="js/app.js"></script>
-</body>
-</html>
+/* ── RELATÓRIO ── */
+.relatorio-box {
+  background: #fff; border: 1px solid var(--bege-escuro);
+  border-radius: var(--radius-lg); padding: 28px;
+  max-width: 800px; box-shadow: var(--shadow-sm);
+}
+.rel-section-title { font-size: 0.92rem; font-weight: 700; color: var(--verde-medio); margin: 22px 0 10px; }
+.rel-section-title:first-child { margin-top: 0; }
+.rel-text { color: var(--texto-medio); line-height: 1.75; font-size: 0.9rem; margin-bottom: 4px; }
+.rel-list { list-style: none; display: flex; flex-direction: column; gap: 0; }
+.rel-list li {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 9px 0; border-bottom: 1px solid var(--bege);
+  font-size: 0.88rem;
+}
+.rel-list li:last-child { border-bottom: none; }
+.rel-amount { font-weight: 700; }
+.rel-amount.receita { color: var(--verde-positivo); }
+.rel-amount.despesa { color: var(--vermelho); }
+
+/* ── MODAL ── */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(27,67,50,0.5);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px; backdrop-filter: blur(3px);
+}
+.modal {
+  background: #fff; border-radius: var(--radius-lg);
+  width: 100%; max-width: 480px;
+  max-height: 90vh; overflow-y: auto;
+  box-shadow: 0 40px 80px rgba(0,0,0,0.3);
+  animation: modalIn .2s ease;
+}
+@keyframes modalIn { from { opacity:0; transform:scale(.96); } to { opacity:1; transform:scale(1); } }
+.modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--bege-escuro);
+}
+.modal-header h3 { font-size: 0.98rem; font-weight: 700; color: var(--texto-escuro); }
+.modal-close { background: none; border: none; color: var(--texto-medio); font-size: 1rem; cursor: pointer; transition: color .18s; padding: 2px; }
+.modal-close:hover { color: var(--vermelho); }
+.modal-body { padding: 18px 22px; display: flex; flex-direction: column; gap: 13px; }
+.form-row { display: flex; flex-direction: column; gap: 5px; }
+.form-row label { font-size: 0.78rem; font-weight: 700; color: var(--texto-medio); text-transform: uppercase; letter-spacing: 0.05em; }
+.form-row input, .form-row select {
+  background: var(--bege-claro); border: 1.5px solid var(--bege-escuro);
+  color: var(--texto-escuro); border-radius: 9px;
+  padding: 10px 13px; font-family: 'Sora', sans-serif;
+  font-size: 0.88rem; transition: border-color .2s;
+}
+.form-row input:focus, .form-row select:focus {
+  outline: none; border-color: var(--verde-medio);
+  background: #fff;
+}
+.form-row-check label { display: flex; align-items: center; gap: 9px; font-size: 0.86rem; font-weight: 500; color: var(--texto-escuro); text-transform: none; letter-spacing: 0; cursor: pointer; }
+.check-label input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--verde-medio); }
+.modal-footer {
+  display: flex; gap: 10px; justify-content: flex-end;
+  padding: 14px 22px; border-top: 1px solid var(--bege-escuro);
+}
+.btn-cancel {
+  background: var(--bege); border: 1px solid var(--bege-escuro);
+  color: var(--texto-medio); padding: 9px 20px; border-radius: 50px;
+  font-family: 'Sora', sans-serif; font-size: 0.86rem;
+  cursor: pointer; transition: all .18s;
+}
+.btn-cancel:hover { background: var(--bege-escuro); color: var(--texto-escuro); }
+.btn-save {
+  background: var(--verde-medio); color: #fff; border: none;
+  padding: 9px 22px; border-radius: 50px;
+  font-family: 'Sora', sans-serif; font-size: 0.86rem; font-weight: 700;
+  cursor: pointer; transition: all .18s;
+  box-shadow: 0 4px 12px rgba(45,106,79,0.3);
+}
+.btn-save:hover { background: var(--verde-escuro); }
+
+/* ══════════════════════════════════════════════════
+   RESPONSIVO
+══════════════════════════════════════════════════ */
+@media(max-width:768px) {
+  .sidebar { transform: translateX(-100%); }
+  .sidebar.open { transform: translateX(0); }
+  .sidebar-overlay.open { display: block; }
+  .main-content { margin-left: 0; }
+  .menu-toggle { display: block; }
+  .tab-content { padding: 16px; }
+  .topbar { padding: 0 14px; }
+  .insights-grid { grid-template-columns: repeat(2,1fr); }
+}
+@media(max-width:480px) {
+  .login-card { padding: 32px 24px 28px; }
+  .insights-grid { grid-template-columns: 1fr; }
+}
+
+/* ══════════════════════════════════════════════════
+   NOVOS COMPONENTES v3.0
+══════════════════════════════════════════════════ */
+
+/* Nav group labels */
+.nav-group-label {
+  font-size: 0.65rem; font-weight: 800;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: rgba(149,213,178,0.45);
+  padding: 14px 13px 4px;
+}
+
+/* Caixinhas */
+.caixinhas-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px,1fr));
+  gap: 16px; margin-bottom: 20px;
+}
+.caixinha-card {
+  background: #fff;
+  border: 1px solid var(--bege-escuro);
+  border-radius: var(--radius);
+  padding: 14px 14px 10px;
+  box-shadow: var(--shadow-sm);
+  transition: transform .2s, box-shadow .2s;
+}
+.caixinha-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.caixinha-header {
+  display: flex; align-items: center; gap: 9px; margin-bottom: 10px;
+}
+.caixinha-icon {
+  width: 34px; height: 34px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1rem; flex-shrink: 0;
+}
+.caixinha-nome { font-weight: 700; font-size: 0.82rem; color: var(--texto-escuro); }
+.caixinha-pct  { font-size: 0.68rem; color: var(--texto-medio); }
+.caixinha-vals {
+  display: grid; grid-template-columns: repeat(3,1fr);
+  gap: 5px; margin-bottom: 8px;
+}
+.caixinha-vals > div {
+  background: var(--bege-claro); border-radius: 7px;
+  padding: 5px 4px; text-align: center;
+  min-width: 0; overflow: hidden;
+}
+/* Labels ALOCADO/GASTO/SOBRA */
+.caixinha-vals > div > span {
+  font-size: 0.58rem !important;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  display: block;
+  color: var(--texto-medio);
+  margin-bottom: 3px;
+  white-space: nowrap;
+}
+/* Valores dentro das caixinhas */
+.caixinha-vals > div > div {
+  font-size: 0.75rem !important;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Comparativo chart container */
+#chartComparativo { max-height: 260px; }
+
+@media(max-width:768px) {
+  .caixinhas-grid { grid-template-columns: 1fr; }
+}
+
+/* ══════════════════════════════════════════════════
+   FLUXO DE CAIXA + MELHORIAS COMPARATIVO
+══════════════════════════════════════════════════ */
+
+/* Fluxo de Caixa */
+.fluxo-table { width:100%; border-collapse: collapse; font-size: 0.85rem; }
+.fluxo-table th {
+  padding: 10px 14px; text-align: left;
+  font-size: 0.72rem; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--texto-medio);
+  background: var(--bege);
+  border-bottom: 2px solid var(--bege-escuro);
+}
+.fluxo-table td {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--bege);
+  font-size: 0.84rem;
+}
+.fluxo-table tr:hover td { background: var(--bege-claro); }
+.fluxo-table tr.fluxo-total td {
+  font-weight: 800; font-size: 0.92rem;
+  background: var(--bege);
+  border-top: 2px solid var(--bege-escuro);
+}
+.fluxo-saldo-positivo { color: var(--verde-positivo); font-weight: 800; }
+.fluxo-saldo-negativo { color: var(--vermelho); font-weight: 800; }
+
+/* Comparativo — linha de destaque */
+.comp-row-best td  { background: rgba(27,122,62,0.05); }
+.comp-row-worst td { background: rgba(192,57,43,0.04); }
+.comp-row-atual td { background: rgba(212,175,55,0.07); font-weight: 700; }
+
+/* Cards de resumo no comparativo */
+.comp-summary {
+  display: grid; grid-template-columns: repeat(4,1fr);
+  gap: 14px; margin-bottom: 20px;
+}
+@media(max-width:900px) { .comp-summary { grid-template-columns: repeat(2,1fr); } }
+.comp-summary-card {
+  background: #fff; border: 1px solid var(--bege-escuro);
+  border-radius: var(--radius); padding: 16px;
+  text-align: center; box-shadow: var(--shadow-sm);
+}
+.comp-summary-label { font-size: 0.70rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--texto-medio); margin-bottom: 6px; }
+.comp-summary-val   { font-size: 1.15rem; font-weight: 800; color: var(--texto-escuro); }
+.comp-summary-sub   { font-size: 0.72rem; color: var(--texto-medio); margin-top: 3px; }
+
+/* ══════════════════════════════════════════════════
+   TRANSIÇÃO FINN
+══════════════════════════════════════════════════ */
+.finn-transition {
+  position: fixed; inset: 0; z-index: 9999;
+  background: linear-gradient(135deg, #1B4332 0%, #2D6A4F 50%, #1B4332 100%);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity .35s ease;
+}
+.finn-transition-in  { opacity: 1 !important; }
+.finn-transition-out { opacity: 0 !important; }
+
+.finn-transition-inner {
+  text-align: center; padding: 40px;
+  max-width: 480px;
+}
+.finn-transition-owl {
+  font-size: 5rem; margin-bottom: 24px;
+  display: block; line-height: 1;
+  animation: finnBounce 1s ease-in-out infinite;
+  filter: drop-shadow(0 8px 24px rgba(212,175,55,0.5));
+}
+@keyframes finnBounce {
+  0%,100% { transform: translateY(0) scale(1); }
+  50%      { transform: translateY(-12px) scale(1.05); }
+}
+.finn-transition-msg {
+  font-family: 'Sora', sans-serif;
+  font-size: 1.2rem; font-weight: 600;
+  color: #fff; line-height: 1.65;
+  margin-bottom: 28px;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+.finn-transition-dots {
+  display: flex; justify-content: center; gap: 8px;
+}
+.finn-transition-dots span {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: rgba(212,175,55,0.5);
+  animation: dotPulse 1.2s ease-in-out infinite;
+}
+.finn-transition-dots span:nth-child(2) { animation-delay: .2s; }
+.finn-transition-dots span:nth-child(3) { animation-delay: .4s; }
+@keyframes dotPulse {
+  0%,100% { transform: scale(1); background: rgba(212,175,55,0.4); }
+  50%      { transform: scale(1.4); background: rgba(212,175,55,1); }
+}
+
+/* ══════════════════════════════════════════════════
+   RODAPÉ DO APP
+══════════════════════════════════════════════════ */
+.app-footer {
+  text-align: center;
+  padding: 16px 24px;
+  font-size: 0.75rem;
+  color: var(--texto-medio);
+  border-top: 1px solid var(--bege-escuro);
+  background: #fff;
+  margin-top: auto;
+}
+.app-footer a {
+  color: var(--verde-medio); font-weight: 700;
+  text-decoration: none;
+}
+.app-footer a:hover { color: var(--verde-escuro); }
+
+/* ══════════════════════════════════════════════════
+   SIDEBAR DEV FOOTER
+══════════════════════════════════════════════════ */
+.sidebar-dev {
+  font-size: 0.68rem; color: rgba(149,213,178,0.45);
+  text-align: center; padding: 10px 14px 4px;
+  line-height: 1.5;
+}
+.sidebar-dev a {
+  color: var(--dourado); text-decoration: none; font-weight: 600;
+}
+.sidebar-dev a:hover { color: var(--dourado-claro); }
+
+/* ══════════════════════════════════════════════════
+   COMECE AQUI
+══════════════════════════════════════════════════ */
+.comece-wrap { max-width: 800px; }
+
+.comece-hero {
+  background: linear-gradient(135deg, var(--verde-escuro), var(--verde-medio));
+  border-radius: var(--radius-lg); padding: 36px 32px;
+  margin-bottom: 28px; color: #fff;
+}
+.comece-hero-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: rgba(212,175,55,0.15); border: 1px solid rgba(212,175,55,0.35);
+  color: var(--dourado); border-radius: 50px;
+  padding: 5px 16px; font-size: 0.76rem; font-weight: 700;
+  margin-bottom: 16px; letter-spacing: 0.07em; text-transform: uppercase;
+}
+.comece-hero-title {
+  font-size: clamp(1.4rem,3vw,1.9rem); font-weight: 800;
+  color: #fff; margin-bottom: 10px; line-height: 1.2;
+}
+.comece-hero-sub {
+  font-size: 0.9rem; color: var(--verde-accent);
+  line-height: 1.65; margin-bottom: 20px; max-width: 520px;
+}
+.comece-hero-tags {
+  display: flex; flex-wrap: wrap; gap: 8px;
+}
+.comece-hero-tags span {
+  background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15);
+  color: #fff; border-radius: 50px;
+  padding: 5px 14px; font-size: 0.78rem; font-weight: 600;
+}
+
+.comece-steps { display: flex; flex-direction: column; gap: 14px; margin-bottom: 24px; }
+.comece-step {
+  background: #fff; border: 1px solid var(--bege-escuro);
+  border-radius: var(--radius); padding: 20px 22px;
+  display: flex; gap: 18px; align-items: flex-start;
+  box-shadow: var(--shadow-sm); transition: transform .2s, box-shadow .2s;
+}
+.comece-step:hover { transform: translateX(4px); box-shadow: var(--shadow-md); }
+.comece-step-num {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: var(--verde-medio); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.85rem; font-weight: 800; flex-shrink: 0;
+}
+.comece-step-body h3 { font-size: 0.95rem; font-weight: 700; color: var(--verde-escuro); margin-bottom: 6px; }
+.comece-step-body p  { font-size: 0.85rem; color: var(--texto-medio); line-height: 1.65; }
+.comece-step-body strong { color: var(--verde-escuro); }
+
+.comece-dica {
+  background: rgba(212,175,55,0.08); border: 1.5px solid rgba(212,175,55,0.3);
+  border-radius: var(--radius); padding: 20px 22px;
+  display: flex; gap: 14px; align-items: flex-start;
+}
+.comece-dica span { font-size: 1.4rem; flex-shrink: 0; }
+.comece-dica strong { display: block; font-size: 0.9rem; color: var(--dourado-escuro); margin-bottom: 5px; }
+.comece-dica p { font-size: 0.84rem; color: var(--texto-medio); line-height: 1.65; }
+
+/* ══════════════════════════════════════════════════
+   CONFIGURAÇÕES
+══════════════════════════════════════════════════ */
+.config-wrap { max-width: 640px; display: flex; flex-direction: column; gap: 18px; }
+.config-section {
+  background: #fff; border: 1px solid var(--bege-escuro);
+  border-radius: var(--radius); padding: 22px 24px;
+  box-shadow: var(--shadow-sm);
+}
+.config-title {
+  font-size: 0.85rem; font-weight: 800; color: var(--verde-escuro);
+  margin-bottom: 16px; padding-bottom: 10px;
+  border-bottom: 1px solid var(--bege-escuro);
+}
+.config-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 0; border-bottom: 1px solid var(--bege);
+}
+.config-row:last-child { border-bottom: none; }
+.config-label { font-size: 0.84rem; color: var(--texto-medio); }
+.config-val    { font-size: 0.84rem; font-weight: 600; color: var(--texto-escuro); }
+.config-link   { font-size: 0.84rem; color: var(--verde-medio); font-weight: 600; text-decoration: none; }
+.config-link:hover { color: var(--verde-escuro); }
+.btn-config-action {
+  background: var(--verde-medio); color: #fff; border: none;
+  padding: 7px 16px; border-radius: 50px;
+  font-family: 'Sora', sans-serif; font-size: 0.8rem; font-weight: 700;
+  cursor: pointer; transition: all .18s;
+}
+.btn-config-action:hover { background: var(--verde-escuro); }
+.btn-config-danger {
+  background: rgba(192,57,43,0.1); color: var(--vermelho); border: 1px solid rgba(192,57,43,0.3);
+  padding: 7px 16px; border-radius: 50px;
+  font-family: 'Sora', sans-serif; font-size: 0.8rem; font-weight: 700;
+  cursor: pointer; transition: all .18s;
+}
+.btn-config-danger:hover { background: var(--vermelho); color: #fff; }
+
+/* Toggle switch */
+.config-toggle { position: relative; display: inline-block; width: 44px; height: 24px; }
+.config-toggle input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+  position: absolute; inset: 0; cursor: pointer;
+  background: var(--bege-escuro); border-radius: 50px;
+  transition: .25s;
+}
+.toggle-slider::before {
+  content: ''; position: absolute;
+  width: 18px; height: 18px; border-radius: 50%;
+  left: 3px; bottom: 3px; background: #fff;
+  transition: .25s; box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+}
+.config-toggle input:checked + .toggle-slider { background: var(--verde-medio); }
+.config-toggle input:checked + .toggle-slider::before { transform: translateX(20px); }
+
+/* ══════════════════════════════════════════════════
+   TERMOS DE USO
+══════════════════════════════════════════════════ */
+.termos-wrap { max-width: 760px; }
+.termos-box {
+  background: #fff; border: 1px solid var(--bege-escuro);
+  border-radius: var(--radius-lg); padding: 32px 36px;
+  box-shadow: var(--shadow-sm);
+}
+.termos-box h3 {
+  font-size: 1rem; font-weight: 800; color: var(--verde-escuro);
+  margin-bottom: 24px; padding-bottom: 14px;
+  border-bottom: 2px solid var(--bege-escuro);
+}
+.termos-box h4 {
+  font-size: 0.82rem; font-weight: 800; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--verde-medio);
+  margin: 20px 0 8px;
+}
+.termos-box p {
+  font-size: 0.87rem; color: var(--texto-medio);
+  line-height: 1.75; margin-bottom: 4px;
+}
+.termos-box ul { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.termos-box ul li { font-size: 0.87rem; color: var(--texto-medio); line-height: 1.5; }
+.termos-box a { color: var(--verde-medio); font-weight: 600; text-decoration: none; }
+.termos-box a:hover { color: var(--verde-escuro); }
+.termos-footer {
+  margin-top: 28px; padding-top: 18px;
+  border-top: 1px solid var(--bege-escuro);
+  font-size: 0.8rem; color: var(--texto-medio);
+  line-height: 1.65; text-align: center;
+}
+
+/* ══════════════════════════════════════════════════
+   MODAL CARTÃO — seleção visual de banco
+══════════════════════════════════════════════════ */
+.banco-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.banco-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  padding: 10px 6px; border-radius: 10px;
+  border: 2px solid var(--bege-escuro);
+  background: var(--bege-claro); cursor: pointer;
+  transition: all .18s; font-family: 'Sora', sans-serif;
+}
+.banco-btn:hover { border-color: var(--verde-medio); transform: translateY(-2px); }
+.banco-btn.selected {
+  border-color: var(--verde-medio);
+  background: rgba(45,106,79,0.06);
+  box-shadow: 0 0 0 3px rgba(45,106,79,0.15);
+}
+.banco-btn-cor {
+  width: 28px; height: 28px; border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+.banco-btn-label {
+  font-size: 0.65rem; font-weight: 700;
+  color: var(--texto-escuro); text-align: center;
+  line-height: 1.2;
+}
+
+/* Preview do cartão */
+.card-preview {
+  width: 100%; border-radius: 12px; padding: 14px 18px;
+  background: linear-gradient(135deg, #2D6A4F, #1B4332);
+  color: #fff; transition: background .3s;
+  min-height: 64px; display: flex; flex-direction: column;
+  justify-content: center;
+}
+.card-preview > div:first-child {
+  font-size: 0.95rem; font-weight: 800; margin-bottom: 3px;
+}
+.card-preview > div:last-child {
+  font-size: 0.75rem; opacity: 0.75;
+}
+
+/* ══════════════════════════════════════════════════
+   SOBRE AS CAIXINHAS
+══════════════════════════════════════════════════ */
+.caixinhas-sobre-wrap { max-width: 900px; }
+
+.caixinhas-sobre-intro {
+  display: flex; align-items: flex-start; gap: 18px;
+  background: linear-gradient(135deg, var(--verde-escuro), var(--verde-medio));
+  border-radius: var(--radius-lg); padding: 28px 30px;
+  color: #fff; margin-bottom: 24px;
+}
+.caixinhas-sobre-intro-icon { font-size: 2.5rem; flex-shrink: 0; }
+.caixinhas-sobre-intro h3 { font-size: 1rem; font-weight: 800; color: #fff; margin-bottom: 8px; }
+.caixinhas-sobre-intro p  { font-size: 0.87rem; color: var(--verde-accent); line-height: 1.7; }
+
+.caixinhas-sobre-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr));
+  gap: 16px; margin-bottom: 24px;
+}
+
+.csobre-card {
+  background: #fff; border: 1px solid var(--bege-escuro);
+  border-top: 4px solid var(--verde-medio);
+  border-radius: var(--radius); padding: 20px;
+  box-shadow: var(--shadow-sm);
+  transition: transform .2s, box-shadow .2s;
+}
+.csobre-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
+
+.csobre-header {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 16px;
+}
+.csobre-badge {
+  font-size: 1rem; font-weight: 800; padding: 4px 10px;
+  border-radius: 50px; flex-shrink: 0;
+}
+.csobre-icon { font-size: 1.2rem; flex-shrink: 0; }
+.csobre-titulo { font-size: 0.88rem; font-weight: 800; color: var(--texto-escuro); }
+.csobre-sub    { font-size: 0.72rem; color: var(--texto-medio); margin-top: 2px; }
+
+.csobre-section { margin-bottom: 12px; }
+.csobre-section-label {
+  font-size: 0.70rem; font-weight: 800; text-transform: uppercase;
+  letter-spacing: 0.07em; margin-bottom: 7px;
+}
+.csobre-ok  { color: var(--verde-medio); }
+.csobre-nao { color: var(--vermelho); }
+
+.csobre-section ul { list-style: none; display: flex; flex-direction: column; gap: 5px; }
+.csobre-section ul li { font-size: 0.82rem; color: var(--texto-medio); line-height: 1.45; padding-left: 4px; }
+
+.csobre-alerta {
+  background: rgba(192,57,43,0.07); border: 1px solid rgba(192,57,43,0.2);
+  border-radius: 8px; padding: 10px 12px;
+  font-size: 0.80rem; color: var(--texto-escuro); line-height: 1.55;
+  margin-top: 10px;
+}
+.csobre-dica {
+  background: rgba(45,106,79,0.06); border: 1px solid rgba(45,106,79,0.18);
+  border-radius: 8px; padding: 10px 12px;
+  font-size: 0.80rem; color: var(--texto-medio); line-height: 1.55;
+  margin-top: 10px;
+}
+
+.csobre-resumo {
+  background: #fff; border: 1px solid var(--bege-escuro);
+  border-radius: var(--radius-lg); padding: 24px 28px;
+  box-shadow: var(--shadow-sm);
+}
+.csobre-resumo h3 { font-size: 0.9rem; font-weight: 800; color: var(--verde-escuro); margin-bottom: 16px; }
+.csobre-resumo-grid {
+  display: grid; grid-template-columns: repeat(3,1fr); gap: 10px;
+}
+@media(max-width:600px) { .csobre-resumo-grid { grid-template-columns: repeat(2,1fr); } }
+.csobre-resumo-grid > div {
+  padding: 10px 14px; background: var(--bege-claro);
+  border-radius: 8px; display: flex; flex-direction: column; gap: 3px;
+}
+.csobre-resumo-grid > div span  { font-size: 0.75rem; color: var(--texto-medio); }
+.csobre-resumo-grid > div strong { font-size: 0.82rem; color: var(--texto-escuro); font-weight: 700; }
+
+@media(max-width:640px) { .caixinhas-sobre-grid { grid-template-columns: 1fr; } }
+
+/* ══════════════════════════════════════════════════
+   PARCELAMENTO
+══════════════════════════════════════════════════ */
+.parcelamento-box {
+  background: var(--bege-claro);
+  border: 1.5px solid var(--bege-escuro);
+  border-radius: 10px;
+  padding: 16px;
+  display: flex; flex-direction: column; gap: 12px;
+  margin-bottom: 4px;
+}
+.form-row-inline {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+}
+.parcelamento-preview {
+  background: #fff;
+  border: 1.5px solid var(--verde-claro);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.parcel-linha {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 0.83rem;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--bege);
+}
+.parcel-linha:last-child { border-bottom: none; }
+.parcel-label { color: var(--texto-medio); }
+.parcel-val   { font-weight: 700; color: var(--texto-escuro); }
+.parcel-val.verde  { color: var(--verde-positivo); }
+.parcel-val.vermelho { color: var(--vermelho); }
+.parcel-val.dourado  { color: var(--dourado-escuro); }
+.parcel-destaque {
+  background: rgba(45,106,79,0.06);
+  border-radius: 8px; padding: 10px 12px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.parcel-destaque .parcel-label { font-weight: 700; color: var(--verde-escuro); font-size: 0.85rem; }
+.parcel-destaque .parcel-val   { font-size: 1rem; color: var(--verde-medio); }
+.lanc-badge.parcelado { background:rgba(0,92,169,0.1);color:#005CA9;font-weight:600; }
+.lanc-badge.juros { background:rgba(192,57,43,0.1);color:var(--vermelho);font-weight:600; }
+
+/* Sync status badges */
+.config-status-badge { font-size:0.82rem; padding:3px 10px; border-radius:50px; font-weight:700; }
+.status-ok      { background:rgba(27,122,62,0.1);  color:var(--verde-positivo); }
+.status-erro    { background:rgba(192,57,43,0.1);  color:var(--vermelho); }
+.status-sync    { background:rgba(212,175,55,0.12);color:var(--dourado-escuro); }
+.status-pendente{ background:var(--bege-escuro);   color:var(--texto-medio); }
+.sync-log {
+  background:var(--bege-claro); border:1px solid var(--bege-escuro);
+  border-radius:8px; padding:10px 12px; margin-top:8px;
+  max-height:160px; overflow-y:auto;
+  display:flex; flex-direction:column; gap:2px;
+}
+
+/* Botões de exportação */
+.export-btns { display:flex; gap:6px; align-items:center; }
+.btn-export {
+  display:inline-flex; align-items:center; gap:5px;
+  background: var(--bege); border: 1.5px solid var(--bege-escuro);
+  color: var(--texto-medio); border-radius:50px;
+  padding: 7px 14px; font-family:'Sora',sans-serif;
+  font-size:0.78rem; font-weight:700; cursor:pointer;
+  transition: all .18s;
+}
+.btn-export:hover { background:var(--bege-escuro); color:var(--texto-escuro); }
+.btn-export-green { background:rgba(27,122,62,0.08); border-color:rgba(27,122,62,0.25); color:var(--verde-medio); }
+.btn-export-green:hover { background:var(--verde-medio); color:#fff; }
