@@ -204,6 +204,7 @@ function logout() {
   if (!confirm('Deseja sair do FinançasPro?')) return;
   state.user = null; state.lancamentos = []; state.cartoes = [];
   destroyAllCharts();
+  localStorage.removeItem('fp_user');
   $('loginScreen').style.display = 'flex';
   $('mainApp').style.display     = 'none';
   $('loginLoading').style.display  = 'none';
@@ -215,6 +216,8 @@ function logout() {
 // INIT
 // ══════════════════════════════════════════════════
 function initApp() {
+  // Salva credencial para auto-login
+  localStorage.setItem('fp_user', JSON.stringify(state.user));
   $('loginScreen').style.display = 'none';
   $('mainApp').style.display     = 'flex';
   $('userName').textContent  = state.user.name;
@@ -722,7 +725,9 @@ function editLancamento(id){const l=state.lancamentos.find(l=>l.id===id);if(l)op
 function deleteLancamento(id){
   if(!confirm('Excluir este lançamento?'))return;
   state.lancamentos=state.lancamentos.filter(l=>l.id!==id);
-  saveLocal();renderAll();
+  saveLocal();
+  sheetsPOST({ action:'deleteData', email:state.user.email, lancamentoId:id });
+  renderAll();
 }
 
 // ══════════════════════════════════════════════════
@@ -1755,4 +1760,33 @@ document.addEventListener('DOMContentLoaded', () => {
   const cardModal = $('cardModal');
   if (modal)     modal.addEventListener('click',     e => { if (e.target === modal)     closeModal(); });
   if (cardModal) cardModal.addEventListener('click', e => { if (e.target === cardModal) closeCardModal(); });
+
+  // Auto-login se já tem sessão salva
+  try {
+    const saved = localStorage.getItem('fp_user');
+    if (saved) {
+      const user = JSON.parse(saved);
+      if (user && user.email) {
+        $('loginLoading').style.display = 'flex';
+        $('googleBtnWrap').style.display = 'none';
+        // Verifica se ainda está autorizado
+        sheetsGET('action=checkAccess&email=' + encodeURIComponent(user.email))
+          .then(data => {
+            if (data && data.authorized) {
+              state.user = user;
+              initApp();
+            } else {
+              localStorage.removeItem('fp_user');
+              $('loginLoading').style.display = 'none';
+              $('googleBtnWrap').style.display = 'flex';
+            }
+          })
+          .catch(() => {
+            // Offline — entra com dados locais
+            state.user = user;
+            initApp();
+          });
+      }
+    }
+  } catch(e) { console.warn('auto-login:', e); }
 });
