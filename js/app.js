@@ -1,4 +1,4 @@
-/* FinançasPro — app.js v3.0 */
+/* FinançasProV2 — app.js v3.0 */
 'use strict';
 
 // ══════════════════════════════════════════════════
