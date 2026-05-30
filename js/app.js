@@ -8,7 +8,7 @@ const CONFIG = {
   // URL do Apps Script — autorização + webhook Hotmart (não muda)
   SHEETS_URL: 'https://script.google.com/macros/s/AKfycbx4v-zbJtaraPD578ScMOYnLTupDW7XAdXoBxPacDnPbk0FrCc4KuXy9sGLIHLu7hdXNQ/exec',
   // Google Client ID — mesmo do Google Sign-In (cole o seu)
-  GOOGLE_CLIENT_ID: 'COLE_SEU_CLIENT_ID_AQUI.apps.googleusercontent.com',
+  GOOGLE_CLIENT_ID: '415111664058-jgshiqlt2qbidcd5frdrg59omjelkg2u.apps.googleusercontent.com',
 };
 
 // APIs do Google usadas para gravar/ler na planilha DA CLIENTE
