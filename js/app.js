@@ -5,8 +5,20 @@
 // CONFIG
 // ══════════════════════════════════════════════════
 const CONFIG = {
+  // URL do Apps Script — autorização + webhook Hotmart (não muda)
   SHEETS_URL: 'https://script.google.com/macros/s/AKfycbx4v-zbJtaraPD578ScMOYnLTupDW7XAdXoBxPacDnPbk0FrCc4KuXy9sGLIHLu7hdXNQ/exec',
+  // Google Client ID — mesmo do Google Sign-In (cole o seu)
+  GOOGLE_CLIENT_ID: 'COLE_SEU_CLIENT_ID_AQUI.apps.googleusercontent.com',
 };
+
+// APIs do Google usadas para gravar/ler na planilha DA CLIENTE
+const SHEETS_API = 'https://sheets.googleapis.com/v4/spreadsheets';
+const DRIVE_API  = 'https://www.googleapis.com/drive/v3/files';
+// Escopos necessários para criar e editar a planilha da cliente
+const OAUTH_SCOPES = [
+  'https://www.googleapis.com/auth/spreadsheets',
+  'https://www.googleapis.com/auth/drive.file',
+].join(' ');
 
 
 // ══════════════════════════════════════════════════
@@ -202,13 +214,19 @@ const FINN_MSGS = [
 // ESTADO
 // ══════════════════════════════════════════════════
 const state = {
-  user: null,
-  lancamentos: [],
-  cartoes: [],
+  user:         null,
+  lancamentos:  [],
+  cartoes:      [],
   currentMonth: new Date().getMonth(),
   currentYear:  new Date().getFullYear(),
-  editId: null,
-  charts: {},
+  editId:       null,
+  charts:       {},
+  // v3.0 — planilha da cliente no Google Drive dela
+  sheetsId:     null,   // ID da planilha no Drive da cliente
+  accessToken:  null,   // Token OAuth para Sheets API
+  tokenExpiry:  0,      // Timestamp de expiração do token
+  tokenClient:  null,   // google.accounts.oauth2 client
+  _credJwt:     null,   // JWT do Google Sign-In (guardado para re-auth)
 };
 
 const $ = id => document.getElementById(id);
@@ -221,6 +239,7 @@ function handleCredentialResponse(response) {
   $('googleBtnWrap').style.display = 'none';
   $('accessDenied').style.display  = 'none';
   const payload = parseJwt(response.credential);
+  state._credJwt = payload; // guarda para re-auth se necessário
   checkAccess(payload.email, payload);
 }
 
@@ -231,17 +250,43 @@ function parseJwt(token) {
 
 async function checkAccess(email, payload) {
   try {
+    // Verifica autorização — continua via planilha de clientes do admin
     const res  = await fetch(`${CONFIG.SHEETS_URL}?action=checkAccess&email=${encodeURIComponent(email)}`);
     const data = await res.json();
     if (data.authorized) {
-      state.user = { email, name: payload.name, picture: payload.picture };
+      state.user     = { email, name: payload.name, picture: payload.picture };
+      state.sheetsId = data.sheetsId || null; // sheetsId salvo de login anterior
+      // Inicializa o cliente OAuth para Sheets API
+      _inicializarTokenClient();
       initApp();
-    } else { showAccessDenied(); }
+    } else {
+      showAccessDenied();
+    }
   } catch(e) {
-    console.warn('Sheets offline, modo local:', e);
+    console.warn('Servidor offline, modo local:', e);
     state.user = { email, name: payload.name, picture: payload.picture };
+    _inicializarTokenClient();
     initApp();
   }
+}
+
+function _inicializarTokenClient() {
+  if (!window.google || !google.accounts || !google.accounts.oauth2) return;
+  state.tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: CONFIG.GOOGLE_CLIENT_ID,
+    scope:     OAUTH_SCOPES,
+    prompt:    '',
+    callback:  (tokenResponse) => {
+      if (tokenResponse && tokenResponse.access_token) {
+        state.accessToken = tokenResponse.access_token;
+        state.tokenExpiry = Date.now() + (tokenResponse.expires_in - 60) * 1000;
+        localStorage.setItem('fp_token_expiry', state.tokenExpiry);
+        console.log('[Auth] Token OAuth obtido — Sheets API disponível');
+        // Após obter token, configura a planilha da cliente
+        setupSheetsCliente();
+      }
+    },
+  });
 }
 
 function showAccessDenied() {
@@ -266,7 +311,6 @@ function logout() {
 // INIT
 // ══════════════════════════════════════════════════
 function initApp() {
-  // Salva credencial para auto-login
   localStorage.setItem('fp_user', JSON.stringify(state.user));
   $('loginScreen').style.display = 'none';
   $('mainApp').style.display     = 'flex';
@@ -278,12 +322,21 @@ function initApp() {
   populateCatFilter();
   updateCategorias();
   renderAll();
-  loadFromSheets();
+  // Solicita token OAuth para Sheets API (abre popup Google se necessário)
+  if (state.tokenClient) {
+    state.tokenClient.requestAccessToken();
+  } else {
+    // Fallback: tenta sem token (dados locais)
+    loadFromSheets();
+  }
   setTimeout(showFinn, 1200);
 }
 
 // ══════════════════════════════════════════════════
 // STORAGE
+// ══════════════════════════════════════════════════
+// ══════════════════════════════════════════════════
+// STORAGE LOCAL
 // ══════════════════════════════════════════════════
 function loadLocal() {
   try {
@@ -297,96 +350,292 @@ function saveLocal() {
   localStorage.setItem('fp_lancamentos', JSON.stringify(state.lancamentos));
   localStorage.setItem('fp_cartoes',     JSON.stringify(state.cartoes));
 }
+
 // ══════════════════════════════════════════════════
-// COMUNICAÇÃO COM SHEETS — via JSONP (resolve CORS)
+// COMUNICAÇÃO COM APPS SCRIPT — só para auth e admin
 // ══════════════════════════════════════════════════
 function sheetsGET(params) {
   return new Promise((resolve, reject) => {
     const cbName = '_fp_cb_' + Date.now();
     const url = CONFIG.SHEETS_URL + '?' + params + '&callback=' + cbName;
-    console.log('[Sheets] GET:', url.substring(0,120));
     const script = document.createElement('script');
     const timeout = setTimeout(() => {
       cleanup();
-      reject(new Error('Timeout — verifique se a URL do Apps Script está correta e reimplantada com Nova Versão'));
+      reject(new Error('Timeout — verifique a URL do Apps Script'));
     }, 15000);
-    window[cbName] = function(data) {
-      cleanup();
-      console.log('[Sheets] Resposta OK:', JSON.stringify(data).substring(0,100));
-      resolve(data);
-    };
+    window[cbName] = function(data) { cleanup(); resolve(data); };
     function cleanup() {
       clearTimeout(timeout);
       delete window[cbName];
       if (script.parentNode) script.parentNode.removeChild(script);
     }
-    script.onerror = (e) => {
-      cleanup();
-      console.error('[Sheets] Erro script:', e);
-      reject(new Error('Erro ao carregar script do Apps Script — verifique a URL'));
-    };
+    script.onerror = (e) => { cleanup(); reject(new Error('Erro ao carregar script')); };
     script.src = url;
     document.head.appendChild(script);
   });
 }
 
 function sheetsPOST(body) {
+  return fetch(CONFIG.SHEETS_URL, {
+    method: 'POST',
+    mode:   'no-cors',
+    body:   JSON.stringify(body),
+  }).then(() => ({ success: true })).catch(() => ({ success: false }));
+}
+
+// ══════════════════════════════════════════════════
+// OAUTH — token para Sheets API da cliente
+// ══════════════════════════════════════════════════
+async function garantirToken() {
+  if (state.accessToken && Date.now() < state.tokenExpiry) return true;
+  if (!state.tokenClient) return false;
   return new Promise((resolve) => {
-    // POST via no-cors — não lemos a resposta mas os dados chegam ao Sheets
-    fetch(CONFIG.SHEETS_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      body: JSON.stringify(body),
-    }).then(() => resolve({ success: true }))
-      .catch(() => resolve({ success: false }));
+    const prev = state.tokenClient.callback;
+    state.tokenClient.callback = (resp) => {
+      state.tokenClient.callback = prev;
+      if (resp && resp.access_token) {
+        state.accessToken = resp.access_token;
+        state.tokenExpiry = Date.now() + (resp.expires_in - 60) * 1000;
+        resolve(true);
+      } else { resolve(false); }
+    };
+    state.tokenClient.requestAccessToken();
   });
 }
 
-async function loadFromSheets() {
-  if (!state.user) return;
+// ══════════════════════════════════════════════════
+// SHEETS API — lê/grava na planilha DA CLIENTE
+// ══════════════════════════════════════════════════
+
+// Cabeçalhos das abas
+const CAB_LANC  = ['ID','Tipo','Descrição','Valor','Categoria','Data','Observação','Pagamento','Recorrente','CartaoID'];
+const CAB_CART  = ['ID','Nome','Limite','Fechamento','Vencimento','Cor','CorCustom'];
+
+async function fpSheetsEscrever(aba, valores) {
+  if (!state.sheetsId || !await garantirToken()) return false;
   try {
-    const params = 'action=getData&email=' + encodeURIComponent(state.user.email);
-    const data = await sheetsGET(params);
-    if (data && data.lancamentos) {
-      state.lancamentos = data.lancamentos;
-      if (data.cartoes && data.cartoes.length > 0) {
-        state.cartoes = data.cartoes;
-      } else if (state.cartoes.length > 0) {
-        state.cartoes.forEach(c => saveCartaoSheets(c));
+    const range = encodeURIComponent(`${aba}!A1`);
+    const res = await fetch(
+      `${SHEETS_API}/${state.sheetsId}/values/${range}?valueInputOption=RAW`,
+      {
+        method:  'PUT',
+        headers: { 'Authorization': `Bearer ${state.accessToken}`, 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ values: valores }),
       }
+    );
+    return res.ok;
+  } catch(e) { console.warn('fpSheetsEscrever:', e); return false; }
+}
+
+async function fpSheetsLer(aba) {
+  if (!state.sheetsId || !await garantirToken()) return [];
+  try {
+    const range = encodeURIComponent(`${aba}!A:Z`);
+    const res  = await fetch(
+      `${SHEETS_API}/${state.sheetsId}/values/${range}`,
+      { headers: { 'Authorization': `Bearer ${state.accessToken}` } }
+    );
+    const data = await res.json();
+    return data.values || [];
+  } catch(e) { console.warn('fpSheetsLer:', e); return []; }
+}
+
+// ══════════════════════════════════════════════════
+// SETUP DA PLANILHA DA CLIENTE
+// ══════════════════════════════════════════════════
+
+async function criarPlanilhaCliente() {
+  if (!await garantirToken()) return null;
+  try {
+    const nome = `FinançasPro — ${state.user.name || state.user.email}`;
+    // Cria o arquivo
+    const res = await fetch(SHEETS_API, {
+      method:  'POST',
+      headers: { 'Authorization': `Bearer ${state.accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        properties: { title: nome },
+        sheets: [
+          { properties: { title: '💰 Lançamentos' } },
+          { properties: { title: '💳 Cartões' } },
+        ]
+      }),
+    });
+    const data = await res.json();
+    if (!data.spreadsheetId) throw new Error('Falha ao criar planilha');
+    const sid = data.spreadsheetId;
+
+    // Escreve cabeçalhos
+    await fetch(
+      `${SHEETS_API}/${sid}/values:batchUpdate`,
+      {
+        method:  'POST',
+        headers: { 'Authorization': `Bearer ${state.accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          valueInputOption: 'RAW',
+          data: [
+            { range: '💰 Lançamentos!A1', values: [CAB_LANC] },
+            { range: '💳 Cartões!A1',     values: [CAB_CART] },
+          ]
+        }),
+      }
+    );
+
+    console.log('[Sheets] Planilha criada:', sid);
+    return sid;
+  } catch(e) { console.warn('criarPlanilhaCliente:', e); return null; }
+}
+
+async function setupSheetsCliente() {
+  if (!state.user) return;
+
+  // Se já temos o sheetsId (do checkAccess ou localStorage)
+  const localId = localStorage.getItem('fp_sheets_id_' + state.user.email);
+  if (!state.sheetsId && localId) state.sheetsId = localId;
+
+  // Cria planilha se ainda não existe
+  if (!state.sheetsId) {
+    addSyncLog('Criando sua planilha pessoal...', 'info');
+    const novoId = await criarPlanilhaCliente();
+    if (novoId) {
+      state.sheetsId = novoId;
+      localStorage.setItem('fp_sheets_id_' + state.user.email, novoId);
+      // Salva o ID no servidor para acesso multi-dispositivo
+      await sheetsPOST({ action: 'saveSheetsId', email: state.user.email, sheetsId: novoId });
+    }
+  } else {
+    // Garante que está salvo localmente também
+    localStorage.setItem('fp_sheets_id_' + state.user.email, state.sheetsId);
+  }
+
+  // Verifica se precisa migrar dados antigos (1ª vez após atualização)
+  const jaMigrou = localStorage.getItem('fp_migrado_' + state.user.email);
+  if (!jaMigrou) {
+    await migrarDadosAntigos();
+  } else {
+    // Login normal — carrega da planilha da cliente
+    await loadFromSheets();
+  }
+}
+
+// ══════════════════════════════════════════════════
+// MIGRAÇÃO — importa dados antigos (v2 → v3) — roda UMA VEZ
+// ══════════════════════════════════════════════════
+async function migrarDadosAntigos() {
+  addSyncLog('Verificando dados anteriores...', 'info');
+  try {
+    const params = 'action=getDadosMigracao&email=' + encodeURIComponent(state.user.email);
+    const dados  = await sheetsGET(params);
+
+    if (dados && dados.migrado && (dados.lancamentos.length > 0 || dados.cartoes.length > 0)) {
+      addSyncLog(`Migrando ${dados.lancamentos.length} lançamentos e ${dados.cartoes.length} cartões...`, 'info');
+
+      // Usa dados antigos como base (mescla com locais)
+      const idsLocais = new Set(state.lancamentos.map(l => l.id));
+      dados.lancamentos.forEach(l => { if (!idsLocais.has(l.id)) state.lancamentos.push(l); });
+
+      const idsCartLocais = new Set(state.cartoes.map(c => c.id));
+      dados.cartoes.forEach(c => { if (!idsCartLocais.has(c.id)) state.cartoes.push(c); });
+
       saveLocal();
       renderAll();
-      localStorage.setItem('fp_ultimo_sync', new Date().toISOString());
+
+      // Grava na planilha da cliente
+      await _syncParaSheetsCliente();
+      addSyncLog('✅ Migração concluída com sucesso!', 'ok');
+    } else {
+      addSyncLog('Nenhum dado anterior encontrado.', 'info');
+      // Se já tem dados locais, sincroniza para a planilha
+      if (state.lancamentos.length > 0 || state.cartoes.length > 0) {
+        await _syncParaSheetsCliente();
+      }
     }
-  } catch(e) { console.warn('loadFromSheets:', e.message); }
+  } catch(e) {
+    console.warn('migrarDadosAntigos:', e);
+    addSyncLog('Migração offline — usando dados locais.', 'warn');
+  }
+
+  // Marca como migrado para não rodar novamente
+  localStorage.setItem('fp_migrado_' + state.user.email, '1');
+}
+
+// ══════════════════════════════════════════════════
+// SINCRONIZAÇÃO — lê e grava na planilha da cliente
+// ══════════════════════════════════════════════════
+
+async function _syncParaSheetsCliente() {
+  if (!state.sheetsId) return false;
+
+  const rowsLanc = [CAB_LANC, ...state.lancamentos.map(l => [
+    l.id||'', l.tipo||'', l.descricao||'', l.valor||0, l.categoria||'',
+    l.data||'', l.obs||'', l.pagamento||'',
+    l.recorrente ? 'TRUE' : 'FALSE', l.cartaoId||'',
+  ])];
+  const rowsCart = [CAB_CART, ...state.cartoes.map(c => [
+    c.id||'', c.nome||'', c.limite||0, c.fechamento||15, c.vencimento||22,
+    c.cor||'#2D6A4F', c.corCustom ? 'TRUE' : 'FALSE',
+  ])];
+
+  const okL = await fpSheetsEscrever('💰 Lançamentos', rowsLanc);
+  const okC = await fpSheetsEscrever('💳 Cartões', rowsCart);
+  return okL && okC;
+}
+
+async function loadFromSheets() {
+  if (!state.user || !state.sheetsId) return;
+  if (!await garantirToken()) return;
+  try {
+    // Lê lançamentos
+    const rowsL = await fpSheetsLer('💰 Lançamentos');
+    if (rowsL.length > 1) {
+      state.lancamentos = rowsL.slice(1).filter(r => r[0]).map(r => ({
+        id:         String(r[0]||''),
+        tipo:       String(r[1]||''),
+        descricao:  String(r[2]||''),
+        valor:      parseFloat(r[3])||0,
+        categoria:  String(r[4]||''),
+        data:       String(r[5]||''),
+        obs:        String(r[6]||''),
+        pagamento:  String(r[7]||''),
+        recorrente: String(r[8]||'').toUpperCase() === 'TRUE',
+        cartaoId:   String(r[9]||''),
+      }));
+    }
+    // Lê cartões
+    const rowsC = await fpSheetsLer('💳 Cartões');
+    if (rowsC.length > 1) {
+      state.cartoes = rowsC.slice(1).filter(r => r[0]).map(r => ({
+        id:         String(r[0]||''),
+        nome:       String(r[1]||''),
+        limite:     parseFloat(r[2])||0,
+        fechamento: parseInt(r[3])||15,
+        vencimento: parseInt(r[4])||22,
+        cor:        String(r[5]||'#2D6A4F'),
+        corCustom:  String(r[6]||'').toUpperCase() === 'TRUE',
+      }));
+    }
+    saveLocal();
+    renderAll();
+    localStorage.setItem('fp_ultimo_sync', new Date().toISOString());
+  } catch(e) { console.warn('loadFromSheets:', e); }
 }
 
 async function saveCartaoSheets(cartao) {
-  if (!state.user || !CONFIG.SHEETS_URL.startsWith('https')) return;
-  await sheetsPOST({ action:'saveCartao', email: state.user.email, cartao });
+  // Grava a planilha inteira de cartões (mais seguro que editar linha por linha)
+  await _syncParaSheetsCliente();
 }
 
 async function deleteCartaoSheets(id) {
-  if (!state.user || !CONFIG.SHEETS_URL.startsWith('https')) return;
-  await sheetsPOST({ action:'deleteCartao', email: state.user.email, cartaoId: id });
+  await _syncParaSheetsCliente();
 }
 
 async function saveToSheets(lancamento) {
-  if (!state.user || !CONFIG.SHEETS_URL.startsWith('https')) return;
-  await sheetsPOST({ action:'saveData', email: state.user.email, lancamento });
+  // Grava a planilha inteira de lançamentos
+  if (!state.sheetsId || !state.user) return;
+  await _syncParaSheetsCliente();
 }
 
-// placeholder para compatibilidade com código legado
-async function saveToSheetsLegacy(lancamento) {
-  if (!state.user || !CONFIG.SHEETS_URL.startsWith('https')) return;
-  try {
-    await fetch(CONFIG.SHEETS_URL, {
-      method: 'POST',
-      redirect: 'follow',
-      body: JSON.stringify({ action:'saveData', email: state.user.email, lancamento }),
-    });
-  } catch(e) { console.warn('saveToSheets:', e); }
-}
+// placeholder compatibilidade
+async function saveToSheetsLegacy(lancamento) { await saveToSheets(lancamento); }
 
 
 // ══════════════════════════════════════════════════
@@ -1607,50 +1856,47 @@ async function testarConexao() {
   setSyncStatus('sincronizando', '🔄 Testando...');
   addSyncLog('Iniciando teste de conexão...', 'info');
   try {
+    // Testa autorização (ainda via Apps Script)
     const params = 'action=checkAccess&email=' + encodeURIComponent(state.user.email);
     const data = await sheetsGET(params);
     if (data && data.authorized !== undefined) {
       setSyncStatus('ok');
-      addSyncLog('Conexão com Google Sheets: OK ✅', 'ok');
+      addSyncLog('Autorização: OK ✅', 'ok');
       addSyncLog('E-mail autorizado: ' + state.user.email, 'ok');
+      // Testa token para Sheets API
+      const temToken = await garantirToken();
+      if (temToken && state.sheetsId) {
+        addSyncLog('Planilha pessoal: conectada ✅', 'ok');
+        addSyncLog('ID: ' + state.sheetsId.substring(0,20) + '...', 'info');
+      } else if (!state.sheetsId) {
+        addSyncLog('Planilha pessoal: ainda não criada.', 'warn');
+      } else {
+        addSyncLog('Token OAuth: não disponível (faça login novamente).', 'warn');
+      }
     } else {
       setSyncStatus('erro');
-      addSyncLog('Resposta inesperada: ' + JSON.stringify(data).slice(0,80), 'warn');
+      addSyncLog('Resposta inesperada do servidor.', 'warn');
     }
   } catch(e) {
     setSyncStatus('erro');
     addSyncLog('Erro de conexão: ' + e.message, 'erro');
-    addSyncLog('Verifique se a URL do Apps Script está correta e reimplantada.', 'warn');
   }
 }
 
 async function sincronizarAgora() {
+  if (!state.sheetsId) {
+    addSyncLog('Planilha não inicializada. Aguarde ou refaça login.', 'warn');
+    setSyncStatus('erro', '❌ Planilha não configurada');
+    return;
+  }
   setSyncStatus('sincronizando', '🔄 Sincronizando...');
-  addSyncLog('Baixando dados do Google Sheets...', 'info');
+  addSyncLog('Baixando dados da sua planilha...', 'info');
   try {
-    const params = 'action=getData&email=' + encodeURIComponent(state.user.email);
-    const data = await sheetsGET(params);
-    if (data && data.lancamentos) {
-      const antesL = state.lancamentos.length;
-      const antesC = state.cartoes.length;
-      state.lancamentos = data.lancamentos;
-      if (data.cartoes && data.cartoes.length > 0) {
-        state.cartoes = data.cartoes;
-      } else if (state.cartoes.length > 0) {
-        addSyncLog('Cartões locais detectados — enviando para Sheets...', 'info');
-        state.cartoes.forEach(c => saveCartaoSheets(c));
-      }
-      saveLocal();
-      renderAll();
-      setSyncStatus('ok');
-      setUltimoSync();
-      addSyncLog(`✅ ${data.lancamentos.length} lançamentos (antes: ${antesL})`, 'ok');
-      addSyncLog(`✅ ${state.cartoes.length} cartões (antes: ${antesC})`, 'ok');
-      renderConfiguracoes();
-    } else {
-      setSyncStatus('erro');
-      addSyncLog('Sheets não retornou dados: ' + JSON.stringify(data).slice(0,80), 'warn');
-    }
+    await loadFromSheets();
+    setSyncStatus('ok');
+    setUltimoSync();
+    addSyncLog(`✅ ${state.lancamentos.length} lançamentos, ${state.cartoes.length} cartões`, 'ok');
+    renderConfiguracoes();
   } catch(e) {
     setSyncStatus('erro');
     addSyncLog('Erro ao sincronizar: ' + e.message, 'erro');
@@ -1658,23 +1904,30 @@ async function sincronizarAgora() {
 }
 
 async function enviarParaSheets() {
+  if (!state.sheetsId) {
+    addSyncLog('Planilha não inicializada.', 'warn');
+    return;
+  }
   if (!state.lancamentos.length && !state.cartoes.length) {
     addSyncLog('Nenhum dado local para enviar.', 'warn');
     return;
   }
   setSyncStatus('sincronizando', '🔄 Enviando...');
   addSyncLog(`Enviando ${state.lancamentos.length} lançamentos e ${state.cartoes.length} cartões...`, 'info');
-  // Envia lançamentos
-  for (const lanc of state.lancamentos) {
-    await sheetsPOST({ action:'saveData', email: state.user.email, lancamento: lanc });
+  try {
+    const ok = await _syncParaSheetsCliente();
+    if (ok) {
+      setSyncStatus('ok');
+      setUltimoSync();
+      addSyncLog(`✅ Envio concluído!`, 'ok');
+    } else {
+      setSyncStatus('erro');
+      addSyncLog('Falha no envio. Tente novamente.', 'erro');
+    }
+  } catch(e) {
+    setSyncStatus('erro');
+    addSyncLog('Erro: ' + e.message, 'erro');
   }
-  // Envia cartões
-  for (const c of state.cartoes) {
-    await saveCartaoSheets(c);
-  }
-  setSyncStatus('ok');
-  setUltimoSync();
-  addSyncLog(`✅ Envio concluído — ${state.lancamentos.length} lançamentos, ${state.cartoes.length} cartões`, 'ok');
 }
 
 function renderConfiguracoes() {
@@ -1756,9 +2009,11 @@ function exportarCSV(tipo = 'lancamentos') {
 }
 
 function abrirNoGoogleSheets() {
-  // Abre a planilha financeira do usuário direto
-  const sheetsUrl = 'https://docs.google.com/spreadsheets/';
-  window.open(sheetsUrl, '_blank');
+  if (state.sheetsId) {
+    window.open(`https://docs.google.com/spreadsheets/d/${state.sheetsId}`, '_blank');
+  } else {
+    window.open('https://docs.google.com/spreadsheets/', '_blank');
+  }
 }
 
 function exportarDados() {
@@ -1873,12 +2128,33 @@ document.addEventListener('DOMContentLoaded', () => {
       if (user && user.email) {
         $('loginLoading').style.display = 'flex';
         $('googleBtnWrap').style.display = 'none';
-        // Verifica se ainda está autorizado
+
+        // Recupera sheetsId local
+        const localSheetsId = localStorage.getItem('fp_sheets_id_' + user.email);
+        if (localSheetsId) state.sheetsId = localSheetsId;
+
+        // Verifica autorização no servidor
         sheetsGET('action=checkAccess&email=' + encodeURIComponent(user.email))
           .then(data => {
             if (data && data.authorized) {
               state.user = user;
-              initApp();
+              if (data.sheetsId && !state.sheetsId) state.sheetsId = data.sheetsId;
+              // No auto-login, inicializa o tokenClient mas não pede token imediatamente
+              // O token será solicitado quando o usuário tentar sincronizar
+              _inicializarTokenClient();
+              // Carrega dados locais — sincronização full requer ação do usuário
+              loadLocal();
+              updateMonthLabel();
+              populateCatFilter();
+              updateCategorias();
+              renderAll();
+              $('loginScreen').style.display = 'none';
+              $('mainApp').style.display     = 'flex';
+              $('userName').textContent  = user.name;
+              $('userEmail').textContent = user.email;
+              if (user.picture) $('userAvatar').src = user.picture;
+              $('loginLoading').style.display = 'none';
+              setTimeout(showFinn, 1200);
             } else {
               localStorage.removeItem('fp_user');
               $('loginLoading').style.display = 'none';
@@ -1888,7 +2164,17 @@ document.addEventListener('DOMContentLoaded', () => {
           .catch(() => {
             // Offline — entra com dados locais
             state.user = user;
-            initApp();
+            loadLocal();
+            updateMonthLabel();
+            populateCatFilter();
+            updateCategorias();
+            renderAll();
+            $('loginScreen').style.display = 'none';
+            $('mainApp').style.display     = 'flex';
+            $('userName').textContent  = user.name;
+            $('userEmail').textContent = user.email;
+            if (user.picture) $('userAvatar').src = user.picture;
+            $('loginLoading').style.display = 'none';
           });
       }
     }
