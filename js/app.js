@@ -413,17 +413,27 @@ const CAB_CART  = ['ID','Nome','Limite','Fechamento','Vencimento','Cor','CorCust
 async function fpSheetsEscrever(aba, valores) {
   if (!state.sheetsId || !await garantirToken()) return false;
   try {
-    const range = encodeURIComponent(`${aba}!A1`);
+    const range = encodeURIComponent(aba + '!A1');
     const res = await fetch(
-      `${SHEETS_API}/${state.sheetsId}/values/${range}?valueInputOption=RAW`,
+      SHEETS_API + '/' + state.sheetsId + '/values/' + range + '?valueInputOption=RAW',
       {
         method:  'PUT',
-        headers: { 'Authorization': `Bearer ${state.accessToken}`, 'Content-Type': 'application/json' },
+        headers: { 'Authorization': 'Bearer ' + state.accessToken, 'Content-Type': 'application/json' },
         body:    JSON.stringify({ values: valores }),
       }
     );
-    return res.ok;
-  } catch(e) { console.warn('fpSheetsEscrever:', e); return false; }
+    if (!res.ok) {
+      try {
+        const err = await res.json();
+        const msg = err.error ? err.error.message : ('HTTP ' + res.status);
+        addSyncLog('Erro ao gravar aba "' + aba + '": ' + msg, 'error');
+        if (res.status === 403) addSyncLog('Acesse console.cloud.google.com → APIs → Ative "Google Sheets API" no projeto 415111664058', 'warn');
+        if (res.status === 401) addSyncLog('Token expirado — faça logout e login novamente.', 'warn');
+      } catch(e2) { addSyncLog('Erro HTTP ' + res.status + ' ao gravar no Sheets.', 'error'); }
+      return false;
+    }
+    return true;
+  } catch(e) { addSyncLog('Erro de rede ao conectar com Sheets API: ' + (e.message||e), 'error'); return false; }
 }
 
 async function fpSheetsLer(aba) {
@@ -853,7 +863,7 @@ function renderMensalChart() {
       {label:'Receita',data:receitas,backgroundColor:'rgba(27,122,62,0.75)',borderRadius:6,borderSkipped:false},
       {label:'Despesa',data:despesas,backgroundColor:'rgba(192,57,43,0.65)',borderRadius:6,borderSkipped:false},
     ]},
-    options:{ responsive:true, maintainAspectRatio:true,
+    options:{ responsive:true, maintainAspectRatio:false,
       plugins:{ legend:{labels:{color:'#555',font:{family:'Sora',size:11}}}, tooltip:{callbacks:{label:ctx=>` ${fmt(ctx.raw)}`}} },
       scales:{ x:{ticks:{color:'#555',font:{family:'Sora',size:11}},grid:{color:'rgba(0,0,0,0.04)'}},
                y:{ticks:{color:'#555',font:{family:'Sora',size:11},callback:v=>`R$${(v/1000).toFixed(0)}k`},grid:{color:'rgba(0,0,0,0.06)'}} } },
@@ -1851,10 +1861,8 @@ function salvarConfig() {
 // NAVEGAÇÃO — TABS (com transição Finn)
 // ══════════════════════════════════════════════════
 function switchTab(tab) {
-  // Transição visual — mostra Finn antes dos renders pesados
-  const cfg = getConfig();
-  const temFinn = cfg.finnAtivo !== false && $('finnTransition');
-  if (temFinn) showFinnTransition();
+  // Transição visual de tela (independe do toggle finnAtivo)
+  if ($('finnTransition')) showFinnTransition();
 
   document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
@@ -1869,8 +1877,7 @@ function switchTab(tab) {
 
   closeSidebar();
 
-  // Delay nos renders pesados para a animação do Finn ter tempo de rodar
-  const delay = temFinn ? 300 : 0;
+  // Delay para a animação do Finn ter tempo de rodar antes dos renders pesados
   setTimeout(function() {
     if (tab === 'relatorios')     renderRelatorio();
     if (tab === 'comparativo')    renderComparativo();
@@ -1879,7 +1886,7 @@ function switchTab(tab) {
     if (tab === 'analise-cartao') renderAnaliseCartao();
     if (tab === 'fluxo')          renderFluxo();
     if (tab === 'configuracoes')  updateConfigPanel();
-  }, delay);
+  }, 300);
 }
 
 // ══════════════════════════════════════════════════
