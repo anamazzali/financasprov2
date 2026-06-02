@@ -17,7 +17,6 @@ const DRIVE_API  = 'https://www.googleapis.com/drive/v3/files';
 // Escopos necessários para criar e editar a planilha da cliente
 const OAUTH_SCOPES = [
   'https://www.googleapis.com/auth/spreadsheets',
-  'https://www.googleapis.com/auth/drive.file',
 ].join(' ');
 
 
@@ -499,33 +498,37 @@ async function criarPlanilhaCliente() {
 async function setupSheetsCliente() {
   if (!state.user) return;
 
-  // Se já temos o sheetsId (do checkAccess ou localStorage)
+  // 1. Prioridade: sheetsId do checkAccess (servidor) ou localStorage
   const localId = localStorage.getItem('fp_sheets_id_' + state.user.email);
   if (!state.sheetsId && localId) state.sheetsId = localId;
 
-  // Cria planilha se ainda não existe
+  // 2. Se ainda não tem sheetsId, tenta criar automaticamente
   if (!state.sheetsId) {
-    addSyncLog('Criando sua planilha pessoal...', 'info');
+    addSyncLog('Configurando sua planilha pessoal...', 'info');
     const novoId = await criarPlanilhaCliente();
     if (novoId) {
       state.sheetsId = novoId;
       localStorage.setItem('fp_sheets_id_' + state.user.email, novoId);
-      // Salva o ID no servidor para acesso multi-dispositivo
       await sheetsPOST({ action: 'saveSheetsId', email: state.user.email, sheetsId: novoId });
+      addSyncLog('Planilha criada com sucesso!', 'ok');
+    } else {
+      // Falha silenciosa — usuário pode vincular manualmente em Configurações
+      console.warn('[Setup] Planilha não criada automaticamente — vincular manualmente em Configurações');
+      updateConfigPanel();
+      return;
     }
   } else {
-    // Garante que está salvo localmente também
     localStorage.setItem('fp_sheets_id_' + state.user.email, state.sheetsId);
   }
 
-  // Verifica se precisa migrar dados antigos (1ª vez após atualização)
+  // 3. Migração ou carregamento normal
   const jaMigrou = localStorage.getItem('fp_migrado_' + state.user.email);
   if (!jaMigrou) {
     await migrarDadosAntigos();
   } else {
-    // Login normal — carrega da planilha da cliente
     await loadFromSheets();
   }
+  updateConfigPanel();
 }
 
 // ══════════════════════════════════════════════════
@@ -598,7 +601,7 @@ async function loadFromSheets() {
     // Lê lançamentos
     const rowsL = await fpSheetsLer('💰 Lançamentos');
     if (rowsL.length > 1) {
-      state.lancamentos = rowsL.slice(1).filter(r => r[0]).map(r => ({
+      const doSheets = rowsL.slice(1).filter(r => r[0]).map(r => ({
         id:         String(r[0]||''),
         tipo:       String(r[1]||''),
         descricao:  String(r[2]||''),
@@ -610,11 +613,17 @@ async function loadFromSheets() {
         recorrente: String(r[8]||'').toUpperCase() === 'TRUE',
         cartaoId:   String(r[9]||''),
       }));
+      // Mescla: dados do Sheets têm prioridade, mantém dados locais não presentes no Sheets
+      if (doSheets.length > 0) {
+        const idsSheets = new Set(doSheets.map(l => l.id));
+        const soLocal = state.lancamentos.filter(l => !idsSheets.has(l.id));
+        state.lancamentos = [...doSheets, ...soLocal];
+      }
     }
     // Lê cartões
     const rowsC = await fpSheetsLer('💳 Cartões');
     if (rowsC.length > 1) {
-      state.cartoes = rowsC.slice(1).filter(r => r[0]).map(r => ({
+      const doSheets = rowsC.slice(1).filter(r => r[0]).map(r => ({
         id:         String(r[0]||''),
         nome:       String(r[1]||''),
         limite:     parseFloat(r[2])||0,
@@ -623,10 +632,19 @@ async function loadFromSheets() {
         cor:        String(r[5]||'#2D6A4F'),
         corCustom:  String(r[6]||'').toUpperCase() === 'TRUE',
       }));
+      if (doSheets.length > 0) {
+        const idsSheets = new Set(doSheets.map(c => c.id));
+        const soLocal = state.cartoes.filter(c => !idsSheets.has(c.id));
+        state.cartoes = [...doSheets, ...soLocal];
+      }
     }
-    saveLocal();
+    // Só sobrescreve local se veio dados reais do Sheets
+    const temDados = state.lancamentos.length > 0 || state.cartoes.length > 0;
+    if (temDados) {
+      saveLocal();
+      localStorage.setItem('fp_ultimo_sync', new Date().toISOString());
+    }
     renderAll();
-    localStorage.setItem('fp_ultimo_sync', new Date().toISOString());
   } catch(e) { console.warn('loadFromSheets:', e); }
 }
 
@@ -2109,26 +2127,6 @@ async function enviarParaSheets() {
   if (!ok) {
     addSyncLog('Sem token OAuth. Faça logout e login novamente.', 'error');
     return;
-  }
-
-  // Antes de criar, tenta achar planilha existente no Drive
-  if (!state.sheetsId) {
-    addSyncLog('Procurando planilha existente no Drive antes de criar...', 'info');
-    try {
-      const query = encodeURIComponent(
-        "name contains 'FinançasPro' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false"
-      );
-      const res  = await fetch(
-        DRIVE_API + '?q=' + query + '&fields=files(id,name)&orderBy=modifiedTime%20desc',
-        { headers: { 'Authorization': 'Bearer ' + state.accessToken } }
-      );
-      const data = await res.json();
-      if (data.files && data.files.length > 0) {
-        state.sheetsId = data.files[0].id;
-        localStorage.setItem('fp_sheets_id_' + state.user.email, state.sheetsId);
-        addSyncLog('Planilha existente encontrada e vinculada!', 'ok');
-      }
-    } catch(e) { /* segue para criar */ }
   }
 
   if (!state.sheetsId) {
