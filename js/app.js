@@ -717,6 +717,7 @@ function renderAll() {
     if (id==='tab-caixinhas')    renderCaixinhas();
     if (id==='tab-dre')          renderDRE();
     if (id==='tab-analise-cartao') renderAnaliseCartao();
+    if (id==='tab-fluxo')          renderFluxo();
   }
 }
 
@@ -1069,7 +1070,7 @@ function deleteLancamento(id){
   if(!confirm('Excluir este lançamento?' + (lancamento.parcelado ? '\n\nAtenção: isso remove TODAS as parcelas.' : ''))) return;
   state.lancamentos=state.lancamentos.filter(l=>l.id!==id);
   saveLocal();
-  sheetsPOST({ action:'deleteData', email:state.user.email, lancamentoId:id });
+  if (state.sheetsId) _syncParaSheetsCliente();
   renderAll();
 }
 
@@ -1818,271 +1819,33 @@ function salvarConfig() {
 }
 
 // ══════════════════════════════════════════════════
-// SINCRONIZAÇÃO
+// NAVEGAÇÃO — TABS
 // ══════════════════════════════════════════════════
-function setSyncStatus(status, msg) {
-  const el = $('configSyncStatus');
-  if (!el) return;
-  const map = {
-    ok:      { text:'✅ Conectado',      cls:'status-ok' },
-    erro:    { text:'❌ Sem conexão',     cls:'status-erro' },
-    sincronizando: { text:'🔄 Sincronizando...', cls:'status-sync' },
-    pendente:{ text:'⏳ Não verificado', cls:'status-pendente' },
-  };
-  const s = map[status] || map.pendente;
-  el.textContent = msg || s.text;
-  el.className = 'config-val config-status-badge ' + s.cls;
-}
-
-function setUltimoSync() {
-  const el = $('configUltimoSync');
-  if (el) el.textContent = new Date().toLocaleString('pt-BR');
-  localStorage.setItem('fp_ultimo_sync', new Date().toISOString());
-}
-
-function addSyncLog(msg, tipo = 'info') {
-  const log = $('syncLog');
-  if (!log) return;
-  log.style.display = 'block';
-  const cores = { info:'var(--texto-medio)', ok:'var(--verde-positivo)', erro:'var(--vermelho)', warn:'var(--dourado-escuro)' };
-  const line = document.createElement('div');
-  line.style.cssText = `font-size:0.78rem;padding:3px 0;color:${cores[tipo]||cores.info};border-bottom:1px solid var(--bege);`;
-  line.textContent = `[${new Date().toLocaleTimeString('pt-BR')}] ${msg}`;
-  log.insertBefore(line, log.firstChild);
-  if (log.children.length > 8) log.removeChild(log.lastChild);
-}
-
-async function testarConexao() {
-  setSyncStatus('sincronizando', '🔄 Testando...');
-  addSyncLog('Iniciando teste de conexão...', 'info');
-  try {
-    // Testa autorização (ainda via Apps Script)
-    const params = 'action=checkAccess&email=' + encodeURIComponent(state.user.email);
-    const data = await sheetsGET(params);
-    if (data && data.authorized !== undefined) {
-      setSyncStatus('ok');
-      addSyncLog('Autorização: OK ✅', 'ok');
-      addSyncLog('E-mail autorizado: ' + state.user.email, 'ok');
-      // Testa token para Sheets API
-      const temToken = await garantirToken();
-      if (temToken && state.sheetsId) {
-        addSyncLog('Planilha pessoal: conectada ✅', 'ok');
-        addSyncLog('ID: ' + state.sheetsId.substring(0,20) + '...', 'info');
-      } else if (!state.sheetsId) {
-        addSyncLog('Planilha pessoal: ainda não criada.', 'warn');
-      } else {
-        addSyncLog('Token OAuth: não disponível (faça login novamente).', 'warn');
-      }
-    } else {
-      setSyncStatus('erro');
-      addSyncLog('Resposta inesperada do servidor.', 'warn');
-    }
-  } catch(e) {
-    setSyncStatus('erro');
-    addSyncLog('Erro de conexão: ' + e.message, 'erro');
-  }
-}
-
-async function sincronizarAgora() {
-  if (!state.sheetsId) {
-    addSyncLog('Planilha não inicializada. Aguarde ou refaça login.', 'warn');
-    setSyncStatus('erro', '❌ Planilha não configurada');
-    return;
-  }
-  setSyncStatus('sincronizando', '🔄 Sincronizando...');
-  addSyncLog('Baixando dados da sua planilha...', 'info');
-  try {
-    await loadFromSheets();
-    setSyncStatus('ok');
-    setUltimoSync();
-    addSyncLog(`✅ ${state.lancamentos.length} lançamentos, ${state.cartoes.length} cartões`, 'ok');
-    renderConfiguracoes();
-  } catch(e) {
-    setSyncStatus('erro');
-    addSyncLog('Erro ao sincronizar: ' + e.message, 'erro');
-  }
-}
-
-async function enviarParaSheets() {
-  if (!state.sheetsId) {
-    addSyncLog('Planilha não inicializada.', 'warn');
-    return;
-  }
-  if (!state.lancamentos.length && !state.cartoes.length) {
-    addSyncLog('Nenhum dado local para enviar.', 'warn');
-    return;
-  }
-  setSyncStatus('sincronizando', '🔄 Enviando...');
-  addSyncLog(`Enviando ${state.lancamentos.length} lançamentos e ${state.cartoes.length} cartões...`, 'info');
-  try {
-    const ok = await _syncParaSheetsCliente();
-    if (ok) {
-      setSyncStatus('ok');
-      setUltimoSync();
-      addSyncLog(`✅ Envio concluído!`, 'ok');
-    } else {
-      setSyncStatus('erro');
-      addSyncLog('Falha no envio. Tente novamente.', 'erro');
-    }
-  } catch(e) {
-    setSyncStatus('erro');
-    addSyncLog('Erro: ' + e.message, 'erro');
-  }
-}
-
-function renderConfiguracoes() {
-  if ($('configEmail')) $('configEmail').textContent = state.user?.email || '—';
-  if ($('configNome'))  $('configNome').textContent  = state.user?.name  || '—';
-  if ($('configTotalLanc'))    $('configTotalLanc').textContent    = state.lancamentos.length;
-  if ($('configTotalCartoes')) $('configTotalCartoes').textContent = state.cartoes.length;
-  const cfg = getConfig();
-  const toggle = $('toggleFinn');
-  if (toggle) toggle.checked = cfg.finnAtivo !== false;
-  // Último sync
-  const ultimo = localStorage.getItem('fp_ultimo_sync');
-  const ultimoEl = $('configUltimoSync');
-  if (ultimoEl && ultimo) ultimoEl.textContent = new Date(ultimo).toLocaleString('pt-BR');
-  // Só reseta status se nunca sincronizou
-  const log = $('syncLog');
-  if (log) { log.style.display = 'none'; log.innerHTML = ''; }
-  const ultimoSync = localStorage.getItem('fp_ultimo_sync');
-  if (!ultimoSync) setSyncStatus('pendente');
-  else setSyncStatus('ok');
-}
-
-// ══════════════════════════════════════════════════
-// EXPORTAÇÃO CSV / GOOGLE DRIVE
-// ══════════════════════════════════════════════════
-function exportarCSV(tipo = 'lancamentos') {
-  let csv = '', nome = '';
-
-  if (tipo === 'lancamentos') {
-    nome = `financaspro_lancamentos_${MONTHS[state.currentMonth]}${state.currentYear}.csv`;
-    const items = getLancamentosMes();
-    csv = 'Data,Tipo,Descrição,Categoria,Valor,Pagamento,Parcelado,Parcela,Total Parcelas,Juros R$,% Juros,Observação\n';
-    items.forEach(l => {
-      csv += [
-        l.data, l.tipo, '"'+escHtml(l.descricao)+'"', l.categoria,
-        parseFloat(l.valor||0).toFixed(2).replace('.',','),
-        '"'+(l.pagamento||'')+'"',
-        l.parcelado ? 'Sim' : 'Não',
-        l.parcelado ? (l.parcelaAtual||1) : '',
-        l.parcelado ? (l.nParcelas||1) : '',
-        l.parcelado ? (parseFloat(l.jurosReais||0).toFixed(2).replace('.',',')) : '',
-        l.parcelado ? (l.pctJuros||0)+'%' : '',
-        '"'+(l.obs||'')+'"',
-      ].join(';') + '\n';
-    });
-  }
-
-  if (tipo === 'anual') {
-    nome = `financaspro_anual_${state.currentYear}.csv`;
-    csv = 'Mês,Receitas,Despesas,Saldo,Taxa Economia%\n';
-    for (let m = 0; m < 12; m++) {
-      const it = getLancamentosMes(m, state.currentYear);
-      const rec  = sumBy(it, 'receita');
-      const desp = sumBy(it, 'despesa');
-      const sal  = rec - desp;
-      const taxa = rec > 0 ? ((sal/rec)*100).toFixed(1) : 0;
-      csv += `${MONTHS[m]}/${state.currentYear};${rec.toFixed(2).replace('.',',')};${desp.toFixed(2).replace('.',',')};${sal.toFixed(2).replace('.',',')};${taxa}%\n`;
-    }
-  }
-
-  if (tipo === 'cartoes') {
-    nome = `financaspro_cartoes_${MONTHS[state.currentMonth]}${state.currentYear}.csv`;
-    csv = 'Cartão,Limite,Fechamento,Vencimento,Fatura do Mês,% Utilizado\n';
-    const mes = getLancamentosMes();
-    state.cartoes.forEach(c => {
-      const fat   = mes.filter(l => l.cartaoId === c.id).reduce((s,l) => s+parseFloat(l.valor||0), 0);
-      const pct   = c.limite > 0 ? ((fat/c.limite)*100).toFixed(1) : 0;
-      csv += `"${c.nome}";${(c.limite||0).toFixed(2).replace('.',',')};${c.fechamento||''};${c.vencimento||''};${fat.toFixed(2).replace('.',',')};${pct}%\n`;
-    });
-  }
-
-  // Download
-  const BOM = '\uFEFF'; // BOM para Excel reconhecer UTF-8
-  const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = nome;
-  a.click();
-}
-
-function abrirNoGoogleSheets() {
-  if (state.sheetsId) {
-    window.open(`https://docs.google.com/spreadsheets/d/${state.sheetsId}`, '_blank');
-  } else {
-    window.open('https://docs.google.com/spreadsheets/', '_blank');
-  }
-}
-
-function exportarDados() {
-  const data = { lancamentos: state.lancamentos, cartoes: state.cartoes, exportadoEm: new Date().toISOString() };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `financaspro_backup_${new Date().toISOString().split('T')[0]}.json`;
-  a.click();
-}
-function limparDados() {
-  if (!confirm('⚠️ Isso apagará todos os dados locais. Os dados no Google Sheets não serão afetados. Continuar?')) return;
-  localStorage.removeItem('fp_lancamentos');
-  localStorage.removeItem('fp_cartoes');
-  state.lancamentos = []; state.cartoes = [];
-  renderAll();
-  alert('Dados locais limpos!');
-}
-
-// ══════════════════════════════════════════════════
-// TRANSIÇÃO FINN
-// ══════════════════════════════════════════════════
-function showFinnTransition(callback) {
-  const cfg = getConfig();
-  if (cfg.finnAtivo === false) { if (callback) callback(); return; }
-  const msg = FINN_MSGS[Math.floor(Math.random() * FINN_MSGS.length)];
-  const el = $('finnTransition');
-  const msgEl = $('finnTransitionMsg');
-  if (!el || !msgEl) { if (callback) callback(); return; }
-  msgEl.textContent = msg;
-  el.style.display = 'flex';
-  el.style.opacity = '0';
-  setTimeout(() => { el.style.opacity = '1'; }, 10);
-  setTimeout(() => {
-    el.style.opacity = '0';
-    setTimeout(() => {
-      el.style.display = 'none';
-      if (callback) callback();
-    }, 400);
-  }, 2200);
-}
-
 function switchTab(tab) {
-  if (tab !== 'dashboard') {
-    showFinnTransition(() => _doSwitchTab(tab));
-  } else {
-    _doSwitchTab(tab);
-  }
-  closeSidebar();
-}
-
-function _doSwitchTab(tab) {
-  $('topbarTitle').textContent = TAB_TITLES[tab] || tab;
   document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+
   const tabEl = $('tab-' + tab);
   if (tabEl) tabEl.style.display = 'block';
-  document.querySelector('[data-tab="' + tab + '"]')?.classList.add('active');
+
+  const navBtn = document.querySelector(`.nav-item[data-tab="${tab}"]`);
+  if (navBtn) navBtn.classList.add('active');
+
+  if ($('topbarTitle')) $('topbarTitle').textContent = TAB_TITLES[tab] || tab;
+
   if (tab === 'relatorios')     renderRelatorio();
   if (tab === 'comparativo')    renderComparativo();
   if (tab === 'dre')            renderDRE();
   if (tab === 'caixinhas')      renderCaixinhas();
   if (tab === 'analise-cartao') renderAnaliseCartao();
   if (tab === 'fluxo')          renderFluxo();
-  if (tab === 'configuracoes')  renderConfiguracoes();
+  if (tab === 'configuracoes')  updateConfigPanel();
+
+  closeSidebar();
 }
 
 // ══════════════════════════════════════════════════
-// SIDEBAR MOBILE
+// SIDEBAR
 // ══════════════════════════════════════════════════
 function toggleSidebar() {
   $('sidebar').classList.toggle('open');
@@ -2094,89 +1857,281 @@ function closeSidebar() {
 }
 
 // ══════════════════════════════════════════════════
-// FINN POPUP (canto inferior)
+// FINN — MASCOTE
 // ══════════════════════════════════════════════════
 function showFinn() {
-  const el = $('finn');
+  const cfg = getConfig();
+  if (cfg.finnAtivo === false) return;
   const msg = FINN_MSGS[Math.floor(Math.random() * FINN_MSGS.length)];
-  if ($('finnMsg')) $('finnMsg').textContent = msg;
-  if (el) el.style.display = 'flex';
-  setTimeout(closeFinn, 3200);
+  $('finnMsg').textContent = msg;
+  $('finn').style.display = 'flex';
+  setTimeout(() => closeFinn(), 8000);
 }
 function closeFinn() {
-  const el = $('finn');
-  if (el) el.style.display = 'none';
+  if ($('finn')) $('finn').style.display = 'none';
+}
+function showFinnTransition() {
+  const msg = FINN_MSGS[Math.floor(Math.random() * FINN_MSGS.length)];
+  if ($('finnTransitionMsg')) $('finnTransitionMsg').textContent = msg;
+  if ($('finnTransition')) {
+    $('finnTransition').style.display = 'flex';
+    setTimeout(() => { $('finnTransition').style.display = 'none'; }, 3000);
+  }
 }
 
 // ══════════════════════════════════════════════════
-// INIT DOM
+// LOG DE SINCRONIZAÇÃO
 // ══════════════════════════════════════════════════
-document.addEventListener('DOMContentLoaded', () => {
-  const today = new Date().toISOString().split('T')[0];
-  const fData = $('fData');
-  if (fData) fData.value = today;
-  const modal     = $('modal');
-  const cardModal = $('cardModal');
-  if (modal)     modal.addEventListener('click',     e => { if (e.target === modal)     closeModal(); });
-  if (cardModal) cardModal.addEventListener('click', e => { if (e.target === cardModal) closeCardModal(); });
+function addSyncLog(msg, tipo = 'info') {
+  const log = $('syncLog');
+  if (!log) return;
+  log.style.display = 'block';
+  const cor    = tipo === 'ok' ? '#1B7A3E' : tipo === 'warn' ? '#A07820' : tipo === 'error' ? '#C0392B' : '#555';
+  const icone  = tipo === 'ok' ? '✅' : tipo === 'warn' ? '⚠️' : tipo === 'error' ? '❌' : 'ℹ️';
+  const linha  = document.createElement('div');
+  linha.style.cssText = `color:${cor};font-size:0.8rem;margin-bottom:4px;`;
+  linha.textContent   = `${icone} ${msg}`;
+  log.appendChild(linha);
+  log.scrollTop = log.scrollHeight;
+}
 
-  // Auto-login se já tem sessão salva
-  try {
-    const saved = localStorage.getItem('fp_user');
-    if (saved) {
-      const user = JSON.parse(saved);
-      if (user && user.email) {
-        $('loginLoading').style.display = 'flex';
-        $('googleBtnWrap').style.display = 'none';
+// ══════════════════════════════════════════════════
+// PAINEL DE CONFIGURAÇÕES
+// ══════════════════════════════════════════════════
+function updateConfigPanel() {
+  if ($('configEmail')) $('configEmail').textContent = state.user?.email || '—';
+  if ($('configNome'))  $('configNome').textContent  = state.user?.name  || '—';
+  if ($('configTotalLanc'))    $('configTotalLanc').textContent    = state.lancamentos.length;
+  if ($('configTotalCartoes')) $('configTotalCartoes').textContent = state.cartoes.length;
 
-        // Recupera sheetsId local
-        const localSheetsId = localStorage.getItem('fp_sheets_id_' + user.email);
-        if (localSheetsId) state.sheetsId = localSheetsId;
+  const ultimo = localStorage.getItem('fp_ultimo_sync');
+  if ($('configUltimoSync')) {
+    $('configUltimoSync').textContent = ultimo
+      ? new Date(ultimo).toLocaleString('pt-BR')
+      : '—';
+  }
 
-        // Verifica autorização no servidor
-        sheetsGET('action=checkAccess&email=' + encodeURIComponent(user.email))
-          .then(data => {
-            if (data && data.authorized) {
-              state.user = user;
-              if (data.sheetsId && !state.sheetsId) state.sheetsId = data.sheetsId;
-              // No auto-login, inicializa o tokenClient mas não pede token imediatamente
-              // O token será solicitado quando o usuário tentar sincronizar
-              _inicializarTokenClient();
-              // Carrega dados locais — sincronização full requer ação do usuário
-              loadLocal();
-              updateMonthLabel();
-              populateCatFilter();
-              updateCategorias();
-              renderAll();
-              $('loginScreen').style.display = 'none';
-              $('mainApp').style.display     = 'flex';
-              $('userName').textContent  = user.name;
-              $('userEmail').textContent = user.email;
-              if (user.picture) $('userAvatar').src = user.picture;
-              $('loginLoading').style.display = 'none';
-              setTimeout(showFinn, 1200);
-            } else {
-              localStorage.removeItem('fp_user');
-              $('loginLoading').style.display = 'none';
-              $('googleBtnWrap').style.display = 'flex';
-            }
-          })
-          .catch(() => {
-            // Offline — entra com dados locais
-            state.user = user;
-            loadLocal();
-            updateMonthLabel();
-            populateCatFilter();
-            updateCategorias();
-            renderAll();
-            $('loginScreen').style.display = 'none';
-            $('mainApp').style.display     = 'flex';
-            $('userName').textContent  = user.name;
-            $('userEmail').textContent = user.email;
-            if (user.picture) $('userAvatar').src = user.picture;
-            $('loginLoading').style.display = 'none';
-          });
-      }
+  const statusEl = $('configSyncStatus');
+  if (statusEl) {
+    if (state.sheetsId) {
+      statusEl.textContent = '✅ Planilha conectada';
+      statusEl.style.color = '#1B7A3E';
+    } else {
+      statusEl.textContent = '⚠️ Aguardando autorização OAuth';
+      statusEl.style.color = '#A07820';
     }
-  } catch(e) { console.warn('auto-login:', e); }
-});
+  }
+
+  if ($('toggleFinn')) {
+    const cfg = getConfig();
+    $('toggleFinn').checked = cfg.finnAtivo !== false;
+  }
+
+  // Limpa log de sync ao abrir o painel
+  if ($('syncLog')) {
+    $('syncLog').innerHTML = '';
+    $('syncLog').style.display = 'none';
+  }
+}
+
+// ══════════════════════════════════════════════════
+// TESTAR CONEXÃO COM SHEETS
+// ══════════════════════════════════════════════════
+async function testarConexao() {
+  const statusEl = $('configSyncStatus');
+  if (statusEl) { statusEl.textContent = '⏳ Testando...'; statusEl.style.color = '#555'; }
+  if ($('syncLog')) { $('syncLog').innerHTML = ''; $('syncLog').style.display = 'none'; }
+
+  addSyncLog('Testando conexão com Apps Script...', 'info');
+
+  // Verifica Apps Script
+  try {
+    await sheetsGET('action=ping');
+    addSyncLog('Apps Script acessível.', 'ok');
+  } catch(e) {
+    addSyncLog('Apps Script offline ou URL incorreta.', 'warn');
+  }
+
+  // Verifica token OAuth e sheetsId
+  const temToken = await garantirToken();
+  if (temToken && state.sheetsId) {
+    addSyncLog('Token OAuth válido.', 'ok');
+    addSyncLog('Planilha ID: ' + state.sheetsId.substring(0, 20) + '...', 'ok');
+    if (statusEl) { statusEl.textContent = '✅ Tudo conectado'; statusEl.style.color = '#1B7A3E'; }
+  } else if (temToken && !state.sheetsId) {
+    addSyncLog('Token OK mas planilha ainda não criada. Clique em "Enviar ↑" para criar.', 'warn');
+    if (statusEl) { statusEl.textContent = '⚠️ Sem planilha'; statusEl.style.color = '#A07820'; }
+  } else {
+    addSyncLog('Sem autorização OAuth. Faça logout e login novamente.', 'error');
+    if (statusEl) { statusEl.textContent = '❌ Sem token OAuth'; statusEl.style.color = '#C0392B'; }
+  }
+}
+
+// ══════════════════════════════════════════════════
+// SINCRONIZAR AGORA — baixa dados do Sheets
+// ══════════════════════════════════════════════════
+async function sincronizarAgora() {
+  if ($('syncLog')) { $('syncLog').innerHTML = ''; $('syncLog').style.display = 'none'; }
+  addSyncLog('Sincronizando — baixando do Sheets...', 'info');
+
+  if (!state.sheetsId) {
+    addSyncLog('Planilha não encontrada. Use "Enviar ↑" primeiro.', 'warn');
+    return;
+  }
+  const ok = await garantirToken();
+  if (!ok) {
+    addSyncLog('Sem token OAuth. Faça logout e login novamente.', 'error');
+    return;
+  }
+
+  await loadFromSheets();
+
+  const ultimo = new Date().toISOString();
+  localStorage.setItem('fp_ultimo_sync', ultimo);
+  if ($('configUltimoSync')) $('configUltimoSync').textContent = new Date(ultimo).toLocaleString('pt-BR');
+  if ($('configTotalLanc'))  $('configTotalLanc').textContent  = state.lancamentos.length;
+  if ($('configTotalCartoes')) $('configTotalCartoes').textContent = state.cartoes.length;
+
+  addSyncLog(`✅ Sincronização concluída — ${state.lancamentos.length} lançamentos, ${state.cartoes.length} cartões.`, 'ok');
+}
+
+// ══════════════════════════════════════════════════
+// ENVIAR PARA SHEETS — sobe dados locais
+// ══════════════════════════════════════════════════
+async function enviarParaSheets() {
+  if ($('syncLog')) { $('syncLog').innerHTML = ''; $('syncLog').style.display = 'none'; }
+  addSyncLog('Preparando envio para o Google Sheets...', 'info');
+
+  const ok = await garantirToken();
+  if (!ok) {
+    addSyncLog('Sem token OAuth. Faça logout e login novamente para autorizar.', 'error');
+    return;
+  }
+
+  // Cria planilha se ainda não existe
+  if (!state.sheetsId) {
+    addSyncLog('Planilha não encontrada — criando agora...', 'info');
+    const novoId = await criarPlanilhaCliente();
+    if (!novoId) {
+      addSyncLog('Falha ao criar planilha. Verifique as permissões OAuth.', 'error');
+      return;
+    }
+    state.sheetsId = novoId;
+    localStorage.setItem('fp_sheets_id_' + state.user.email, novoId);
+    // Salva ID no servidor para acesso multi-dispositivo
+    sheetsPOST({ action: 'saveSheetsId', email: state.user.email, sheetsId: novoId });
+    addSyncLog('Planilha criada: ' + novoId.substring(0, 20) + '...', 'ok');
+  }
+
+  addSyncLog(`Enviando ${state.lancamentos.length} lançamentos e ${state.cartoes.length} cartões...`, 'info');
+  const resultado = await _syncParaSheetsCliente();
+
+  if (resultado) {
+    const agora = new Date().toISOString();
+    localStorage.setItem('fp_ultimo_sync', agora);
+    if ($('configUltimoSync')) $('configUltimoSync').textContent = new Date(agora).toLocaleString('pt-BR');
+    const statusEl = $('configSyncStatus');
+    if (statusEl) { statusEl.textContent = '✅ Planilha conectada'; statusEl.style.color = '#1B7A3E'; }
+    addSyncLog(`✅ Dados enviados com sucesso para o Google Sheets!`, 'ok');
+  } else {
+    addSyncLog('Falha no envio. Verifique conexão e permissões.', 'error');
+  }
+}
+
+// ══════════════════════════════════════════════════
+// EXPORTAR CSV
+// ══════════════════════════════════════════════════
+function exportarCSV(tipo) {
+  let rows = [], nome = '';
+
+  if (tipo === 'lancamentos') {
+    nome = `FinancasPro_Lancamentos_${MONTHS[state.currentMonth]}${state.currentYear}.csv`;
+    rows = [
+      ['Tipo','Descrição','Valor (R$)','Categoria','Data','Pagamento','Observação','Recorrente','Parcelas'],
+      ...getLancamentosMes().map(l => [
+        l.tipo,
+        l.descricao,
+        l.valor.toFixed(2).replace('.', ','),
+        l.categoria,
+        l.data,
+        l.pagamento || '',
+        l.obs || '',
+        l.recorrente ? 'Sim' : 'Não',
+        l.parcelado ? `${l.parcelaAtual}/${l.nParcelas}` : '',
+      ]),
+    ];
+  } else if (tipo === 'cartoes') {
+    nome = `FinancasPro_Cartoes_${state.currentYear}.csv`;
+    rows = [
+      ['Nome','Limite (R$)','Dia Fechamento','Dia Vencimento'],
+      ...state.cartoes.map(c => [
+        c.nome,
+        (c.limite || 0).toFixed(2).replace('.', ','),
+        c.fechamento,
+        c.vencimento,
+      ]),
+    ];
+  } else if (tipo === 'anual') {
+    nome = `FinancasPro_Anual_${state.currentYear}.csv`;
+    rows = [['Mês','Receita (R$)','Despesa (R$)','Saldo (R$)','Taxa Economia']];
+    for (let m = 0; m < 12; m++) {
+      const it   = getLancamentosMes(m, state.currentYear);
+      const rec  = sumBy(it, 'receita');
+      const desp = sumBy(it, 'despesa');
+      const sal  = rec - desp;
+      const taxa = rec > 0 ? Math.round((sal / rec) * 100) : 0;
+      rows.push([
+        `${MONTHS[m]}/${state.currentYear}`,
+        rec.toFixed(2).replace('.', ','),
+        desp.toFixed(2).replace('.', ','),
+        sal.toFixed(2).replace('.', ','),
+        `${taxa}%`,
+      ]);
+    }
+  }
+
+  if (!rows.length) { alert('Nenhum dado para exportar.'); return; }
+
+  const csv  = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\r\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = nome; document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+// ══════════════════════════════════════════════════
+// EXPORTAR BACKUP JSON
+// ══════════════════════════════════════════════════
+function exportarDados() {
+  const backup = {
+    version:      '2.0',
+    exportadoEm:  new Date().toISOString(),
+    usuario:      state.user?.email || '',
+    lancamentos:  state.lancamentos,
+    cartoes:      state.cartoes,
+  };
+  const json = JSON.stringify(backup, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `FinancasPro_Backup_${new Date().toISOString().split('T')[0]}.json`;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+// ══════════════════════════════════════════════════
+// LIMPAR DADOS LOCAIS
+// ══════════════════════════════════════════════════
+function limparDados() {
+  if (!confirm('⚠️ Isso apagará TODOS os lançamentos e cartões do armazenamento local.\n\nOs dados no Google Sheets permanecem intactos.\n\nDeseja continuar?')) return;
+  if (!confirm('Confirmar: apagar dados locais?')) return;
+  state.lancamentos = [];
+  state.cartoes     = [];
+  saveLocal();
+  destroyAllCharts();
+  renderAll();
+  updateConfigPanel();
+  alert('✅ Dados locais apagados.\nUse "Sincronizar ↓" para recarregar do Google Sheets.');
+}
