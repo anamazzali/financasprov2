@@ -18,6 +18,7 @@ const DRIVE_API  = 'https://www.googleapis.com/drive/v3/files';
 const OAUTH_SCOPES = [
   'https://www.googleapis.com/auth/spreadsheets',
   'https://www.googleapis.com/auth/drive.file',
+  'https://www.googleapis.com/auth/drive.readonly',
 ].join(' ');
 
 
@@ -1355,7 +1356,7 @@ function renderComparativo() {
           {label:'Saldo',data:rows.map(r=>r.saldo),borderColor:'#D4AF37',backgroundColor:'transparent',tension:0.4,pointRadius:4,borderDash:[5,3]},
         ]
       },
-      options:{responsive:true,maintainAspectRatio:true,
+      options:{responsive:true,maintainAspectRatio:false,
         plugins:{legend:{labels:{color:'#555',font:{family:'Sora',size:11}}},tooltip:{callbacks:{label:ctx=>` ${fmt(ctx.raw)}`}}},
         scales:{x:{ticks:{color:'#555',font:{family:'Sora',size:11}},grid:{color:'rgba(0,0,0,0.04)'}},
                 y:{ticks:{color:'#555',font:{family:'Sora',size:11},callback:v=>`R$${(v/1000).toFixed(1)}k`},grid:{color:'rgba(0,0,0,0.05)'}}}},
@@ -1819,9 +1820,15 @@ function salvarConfig() {
 }
 
 // ══════════════════════════════════════════════════
-// NAVEGAÇÃO — TABS
+// NAVEGAÇÃO — TABS (com transição Finn)
 // ══════════════════════════════════════════════════
 function switchTab(tab) {
+  // Transição visual entre abas
+  const cfg = getConfig();
+  if (cfg.finnAtivo !== false && $('finnTransition')) {
+    showFinnTransition();
+  }
+
   document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
 
@@ -1863,8 +1870,8 @@ function showFinn() {
   const cfg = getConfig();
   if (cfg.finnAtivo === false) return;
   const msg = FINN_MSGS[Math.floor(Math.random() * FINN_MSGS.length)];
-  $('finnMsg').textContent = msg;
-  $('finn').style.display = 'flex';
+  if ($('finnMsg')) $('finnMsg').textContent = msg;
+  if ($('finn')) $('finn').style.display = 'flex';
   setTimeout(() => closeFinn(), 8000);
 }
 function closeFinn() {
@@ -1872,45 +1879,45 @@ function closeFinn() {
 }
 function showFinnTransition() {
   const msg = FINN_MSGS[Math.floor(Math.random() * FINN_MSGS.length)];
-  if ($('finnTransitionMsg')) $('finnTransitionMsg').textContent = msg;
-  if ($('finnTransition')) {
-    $('finnTransition').style.display = 'flex';
-    setTimeout(() => { $('finnTransition').style.display = 'none'; }, 3000);
-  }
+  const ft  = $('finnTransition');
+  const ftm = $('finnTransitionMsg');
+  if (!ft) return;
+  if (ftm) ftm.textContent = msg;
+  ft.style.display = 'flex';
+  setTimeout(() => { ft.style.display = 'none'; }, 900);
 }
 
 // ══════════════════════════════════════════════════
 // LOG DE SINCRONIZAÇÃO
 // ══════════════════════════════════════════════════
-function addSyncLog(msg, tipo = 'info') {
+function addSyncLog(msg, tipo) {
+  tipo = tipo || 'info';
   const log = $('syncLog');
   if (!log) return;
   log.style.display = 'block';
-  const cor    = tipo === 'ok' ? '#1B7A3E' : tipo === 'warn' ? '#A07820' : tipo === 'error' ? '#C0392B' : '#555';
-  const icone  = tipo === 'ok' ? '✅' : tipo === 'warn' ? '⚠️' : tipo === 'error' ? '❌' : 'ℹ️';
+  const cores  = { ok:'#1B7A3E', warn:'#A07820', error:'#C0392B', info:'#555' };
+  const icones = { ok:'✅', warn:'⚠️', error:'❌', info:'ℹ️' };
   const linha  = document.createElement('div');
-  linha.style.cssText = `color:${cor};font-size:0.8rem;margin-bottom:4px;`;
-  linha.textContent   = `${icone} ${msg}`;
+  linha.style.cssText = 'color:' + (cores[tipo]||'#555') + ';font-size:0.79rem;margin-bottom:3px;line-height:1.4;';
+  linha.textContent   = (icones[tipo]||'ℹ️') + ' ' + msg;
   log.appendChild(linha);
   log.scrollTop = log.scrollHeight;
 }
 
 // ══════════════════════════════════════════════════
-// PAINEL DE CONFIGURAÇÕES
+// PAINEL CONFIGURAÇÕES
 // ══════════════════════════════════════════════════
 function updateConfigPanel() {
-  if ($('configEmail')) $('configEmail').textContent = state.user?.email || '—';
-  if ($('configNome'))  $('configNome').textContent  = state.user?.name  || '—';
+  if ($('configEmail')) $('configEmail').textContent = state.user ? state.user.email : '—';
+  if ($('configNome'))  $('configNome').textContent  = state.user ? state.user.name  : '—';
   if ($('configTotalLanc'))    $('configTotalLanc').textContent    = state.lancamentos.length;
   if ($('configTotalCartoes')) $('configTotalCartoes').textContent = state.cartoes.length;
 
   const ultimo = localStorage.getItem('fp_ultimo_sync');
   if ($('configUltimoSync')) {
     $('configUltimoSync').textContent = ultimo
-      ? new Date(ultimo).toLocaleString('pt-BR')
-      : '—';
+      ? new Date(ultimo).toLocaleString('pt-BR') : '—';
   }
-
   const statusEl = $('configSyncStatus');
   if (statusEl) {
     if (state.sheetsId) {
@@ -1921,61 +1928,144 @@ function updateConfigPanel() {
       statusEl.style.color = '#A07820';
     }
   }
-
   if ($('toggleFinn')) {
     const cfg = getConfig();
     $('toggleFinn').checked = cfg.finnAtivo !== false;
   }
-
-  // Limpa log de sync ao abrir o painel
+  if ($('inputSheetsId') && state.sheetsId) {
+    $('inputSheetsId').value = state.sheetsId;
+  }
   if ($('syncLog')) {
-    $('syncLog').innerHTML = '';
+    $('syncLog').innerHTML  = '';
     $('syncLog').style.display = 'none';
   }
 }
 
 // ══════════════════════════════════════════════════
-// TESTAR CONEXÃO COM SHEETS
+// TESTAR CONEXÃO
 // ══════════════════════════════════════════════════
 async function testarConexao() {
+  if ($('syncLog')) { $('syncLog').innerHTML = ''; $('syncLog').style.display = 'none'; }
   const statusEl = $('configSyncStatus');
   if (statusEl) { statusEl.textContent = '⏳ Testando...'; statusEl.style.color = '#555'; }
-  if ($('syncLog')) { $('syncLog').innerHTML = ''; $('syncLog').style.display = 'none'; }
 
-  addSyncLog('Testando conexão com Apps Script...', 'info');
+  addSyncLog('Iniciando teste de conexão...', 'info');
 
-  // Verifica Apps Script
+  // Testa Apps Script
   try {
-    await sheetsGET('action=ping');
-    addSyncLog('Apps Script acessível.', 'ok');
+    const r = await fetch(CONFIG.SHEETS_URL + '?action=ping');
+    const t = await r.text();
+    addSyncLog('Autorização: OK ✅', 'ok');
+    if (state.user) addSyncLog('E-mail autorizado: ' + state.user.email, 'ok');
   } catch(e) {
-    addSyncLog('Apps Script offline ou URL incorreta.', 'warn');
+    addSyncLog('Apps Script inacessível.', 'warn');
   }
 
-  // Verifica token OAuth e sheetsId
+  // Testa token OAuth
   const temToken = await garantirToken();
-  if (temToken && state.sheetsId) {
-    addSyncLog('Token OAuth válido.', 'ok');
-    addSyncLog('Planilha ID: ' + state.sheetsId.substring(0, 20) + '...', 'ok');
-    if (statusEl) { statusEl.textContent = '✅ Tudo conectado'; statusEl.style.color = '#1B7A3E'; }
-  } else if (temToken && !state.sheetsId) {
-    addSyncLog('Token OK mas planilha ainda não criada. Clique em "Enviar ↑" para criar.', 'warn');
-    if (statusEl) { statusEl.textContent = '⚠️ Sem planilha'; statusEl.style.color = '#A07820'; }
+  if (temToken) {
+    addSyncLog('Token OAuth: válido ✅', 'ok');
   } else {
-    addSyncLog('Sem autorização OAuth. Faça logout e login novamente.', 'error');
+    addSyncLog('Token OAuth: não disponível. Faça logout e login novamente.', 'error');
     if (statusEl) { statusEl.textContent = '❌ Sem token OAuth'; statusEl.style.color = '#C0392B'; }
+    return;
+  }
+
+  // Testa sheetsId
+  if (state.sheetsId) {
+    addSyncLog('Planilha ID: ' + state.sheetsId.substring(0, 22) + '...', 'ok');
+    if (statusEl) { statusEl.textContent = '✅ Tudo conectado'; statusEl.style.color = '#1B7A3E'; }
+  } else {
+    addSyncLog('Planilha pessoal: ainda não criada.', 'warn');
+    addSyncLog('Use "🔍 Buscar no Drive" ou "Enviar ↑" para criar.', 'info');
+    if (statusEl) { statusEl.textContent = '⚠️ Planilha não configurada'; statusEl.style.color = '#A07820'; }
   }
 }
 
 // ══════════════════════════════════════════════════
-// SINCRONIZAR AGORA — baixa dados do Sheets
+// BUSCAR PLANILHA EXISTENTE NO GOOGLE DRIVE
+// ══════════════════════════════════════════════════
+async function buscarPlanilhaNosDrive() {
+  if ($('syncLog')) { $('syncLog').innerHTML = ''; $('syncLog').style.display = 'none'; }
+  addSyncLog('Buscando planilha FinançasPro no Google Drive...', 'info');
+
+  const ok = await garantirToken();
+  if (!ok) {
+    addSyncLog('Sem token OAuth. Faça logout e login novamente para autorizar.', 'error');
+    return;
+  }
+
+  try {
+    const query = encodeURIComponent(
+      "name contains 'FinançasPro' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false"
+    );
+    const res  = await fetch(
+      DRIVE_API + '?q=' + query + '&fields=files(id,name,modifiedTime)&orderBy=modifiedTime%20desc',
+      { headers: { 'Authorization': 'Bearer ' + state.accessToken } }
+    );
+    const data = await res.json();
+
+    if (data.error) {
+      addSyncLog('Erro Drive API: ' + data.error.message, 'error');
+      return;
+    }
+
+    if (data.files && data.files.length > 0) {
+      addSyncLog('Encontrada(s) ' + data.files.length + ' planilha(s):', 'ok');
+      const log = $('syncLog');
+      data.files.forEach(function(p) {
+        const dt   = p.modifiedTime ? new Date(p.modifiedTime).toLocaleDateString('pt-BR') : '';
+        const div  = document.createElement('div');
+        div.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:rgba(27,122,62,0.07);border-radius:6px;margin:3px 0;font-size:0.78rem;gap:8px;';
+        div.innerHTML = '<span>📊 <strong>' + p.name + '</strong> <span style="color:#999;">' + dt + '</span></span>'
+          + '<button onclick="vincularPlanilha(\'' + p.id + '\')" style="background:#1B7A3E;color:#fff;border:none;border-radius:6px;padding:3px 10px;cursor:pointer;font-size:0.75rem;white-space:nowrap;">Vincular ✅</button>';
+        if (log) log.appendChild(div);
+      });
+      // Auto-vincula a mais recente
+      vincularPlanilha(data.files[0].id, false);
+      addSyncLog('✅ Mais recente vinculada automaticamente. Clique em "Sincronizar ↓" para carregar os dados.', 'ok');
+    } else {
+      addSyncLog('Nenhuma planilha "FinançasPro" encontrada.', 'warn');
+      addSyncLog('Tente colar o ID manualmente abaixo, ou use "Enviar ↑" para criar.', 'info');
+    }
+  } catch(e) {
+    addSyncLog('Erro ao buscar no Drive: ' + (e.message || e), 'error');
+  }
+}
+
+// Vincula sheetsId (do Drive ou manual)
+function vincularPlanilha(id, exibeLog) {
+  if (exibeLog === undefined) exibeLog = true;
+  if (!id) return;
+  state.sheetsId = id;
+  localStorage.setItem('fp_sheets_id_' + state.user.email, id);
+  sheetsPOST({ action: 'saveSheetsId', email: state.user.email, sheetsId: id });
+  if ($('inputSheetsId')) $('inputSheetsId').value = id;
+  updateConfigPanel();
+  if (exibeLog) {
+    addSyncLog('✅ Planilha vinculada: ' + id.substring(0, 24) + '...', 'ok');
+    addSyncLog('Clique em "Sincronizar ↓" para carregar seus dados.', 'info');
+  }
+}
+
+// Vincula a partir do campo manual (aceita URL ou ID puro)
+function vincularPlanilhaManual() {
+  if ($('syncLog')) { $('syncLog').innerHTML = ''; $('syncLog').style.display = 'none'; }
+  const raw = $('inputSheetsId') ? $('inputSheetsId').value.trim() : '';
+  if (!raw) { addSyncLog('Cole o ID ou a URL completa da planilha no campo acima.', 'warn'); return; }
+  const match = raw.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+  vincularPlanilha(match ? match[1] : raw);
+}
+
+// ══════════════════════════════════════════════════
+// SINCRONIZAR — baixa do Sheets
 // ══════════════════════════════════════════════════
 async function sincronizarAgora() {
   if ($('syncLog')) { $('syncLog').innerHTML = ''; $('syncLog').style.display = 'none'; }
-  addSyncLog('Sincronizando — baixando do Sheets...', 'info');
+  addSyncLog('Sincronizando — baixando dados do Sheets...', 'info');
 
   if (!state.sheetsId) {
-    addSyncLog('Planilha não encontrada. Use "Enviar ↑" primeiro.', 'warn');
+    addSyncLog('Planilha não encontrada. Use "🔍 Buscar no Drive" primeiro.', 'warn');
     return;
   }
   const ok = await garantirToken();
@@ -1986,17 +2076,17 @@ async function sincronizarAgora() {
 
   await loadFromSheets();
 
-  const ultimo = new Date().toISOString();
-  localStorage.setItem('fp_ultimo_sync', ultimo);
-  if ($('configUltimoSync')) $('configUltimoSync').textContent = new Date(ultimo).toLocaleString('pt-BR');
-  if ($('configTotalLanc'))  $('configTotalLanc').textContent  = state.lancamentos.length;
+  const agora = new Date().toISOString();
+  localStorage.setItem('fp_ultimo_sync', agora);
+  if ($('configUltimoSync'))   $('configUltimoSync').textContent   = new Date(agora).toLocaleString('pt-BR');
+  if ($('configTotalLanc'))    $('configTotalLanc').textContent    = state.lancamentos.length;
   if ($('configTotalCartoes')) $('configTotalCartoes').textContent = state.cartoes.length;
 
-  addSyncLog(`✅ Sincronização concluída — ${state.lancamentos.length} lançamentos, ${state.cartoes.length} cartões.`, 'ok');
+  addSyncLog('✅ ' + state.lancamentos.length + ' lançamentos e ' + state.cartoes.length + ' cartões carregados!', 'ok');
 }
 
 // ══════════════════════════════════════════════════
-// ENVIAR PARA SHEETS — sobe dados locais
+// ENVIAR — sobe dados locais para Sheets
 // ══════════════════════════════════════════════════
 async function enviarParaSheets() {
   if ($('syncLog')) { $('syncLog').innerHTML = ''; $('syncLog').style.display = 'none'; }
@@ -2004,35 +2094,51 @@ async function enviarParaSheets() {
 
   const ok = await garantirToken();
   if (!ok) {
-    addSyncLog('Sem token OAuth. Faça logout e login novamente para autorizar.', 'error');
+    addSyncLog('Sem token OAuth. Faça logout e login novamente.', 'error');
     return;
   }
 
-  // Cria planilha se ainda não existe
+  // Antes de criar, tenta achar planilha existente no Drive
   if (!state.sheetsId) {
-    addSyncLog('Planilha não encontrada — criando agora...', 'info');
+    addSyncLog('Procurando planilha existente no Drive antes de criar...', 'info');
+    try {
+      const query = encodeURIComponent(
+        "name contains 'FinançasPro' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false"
+      );
+      const res  = await fetch(
+        DRIVE_API + '?q=' + query + '&fields=files(id,name)&orderBy=modifiedTime%20desc',
+        { headers: { 'Authorization': 'Bearer ' + state.accessToken } }
+      );
+      const data = await res.json();
+      if (data.files && data.files.length > 0) {
+        state.sheetsId = data.files[0].id;
+        localStorage.setItem('fp_sheets_id_' + state.user.email, state.sheetsId);
+        addSyncLog('Planilha existente encontrada e vinculada!', 'ok');
+      }
+    } catch(e) { /* segue para criar */ }
+  }
+
+  if (!state.sheetsId) {
+    addSyncLog('Criando nova planilha pessoal...', 'info');
     const novoId = await criarPlanilhaCliente();
     if (!novoId) {
-      addSyncLog('Falha ao criar planilha. Verifique as permissões OAuth.', 'error');
+      addSyncLog('Falha ao criar planilha. Verifique permissões OAuth.', 'error');
       return;
     }
     state.sheetsId = novoId;
     localStorage.setItem('fp_sheets_id_' + state.user.email, novoId);
-    // Salva ID no servidor para acesso multi-dispositivo
     sheetsPOST({ action: 'saveSheetsId', email: state.user.email, sheetsId: novoId });
-    addSyncLog('Planilha criada: ' + novoId.substring(0, 20) + '...', 'ok');
+    addSyncLog('Planilha criada: ' + novoId.substring(0, 22) + '...', 'ok');
   }
 
-  addSyncLog(`Enviando ${state.lancamentos.length} lançamentos e ${state.cartoes.length} cartões...`, 'info');
+  addSyncLog('Enviando ' + state.lancamentos.length + ' lançamentos e ' + state.cartoes.length + ' cartões...', 'info');
   const resultado = await _syncParaSheetsCliente();
 
   if (resultado) {
     const agora = new Date().toISOString();
     localStorage.setItem('fp_ultimo_sync', agora);
-    if ($('configUltimoSync')) $('configUltimoSync').textContent = new Date(agora).toLocaleString('pt-BR');
-    const statusEl = $('configSyncStatus');
-    if (statusEl) { statusEl.textContent = '✅ Planilha conectada'; statusEl.style.color = '#1B7A3E'; }
-    addSyncLog(`✅ Dados enviados com sucesso para o Google Sheets!`, 'ok');
+    updateConfigPanel();
+    addSyncLog('✅ Dados enviados com sucesso para o Google Sheets!', 'ok');
   } else {
     addSyncLog('Falha no envio. Verifique conexão e permissões.', 'error');
   }
@@ -2042,61 +2148,42 @@ async function enviarParaSheets() {
 // EXPORTAR CSV
 // ══════════════════════════════════════════════════
 function exportarCSV(tipo) {
-  let rows = [], nome = '';
+  var rows = [], nome = '';
 
   if (tipo === 'lancamentos') {
-    nome = `FinancasPro_Lancamentos_${MONTHS[state.currentMonth]}${state.currentYear}.csv`;
-    rows = [
-      ['Tipo','Descrição','Valor (R$)','Categoria','Data','Pagamento','Observação','Recorrente','Parcelas'],
-      ...getLancamentosMes().map(l => [
-        l.tipo,
-        l.descricao,
-        l.valor.toFixed(2).replace('.', ','),
-        l.categoria,
-        l.data,
-        l.pagamento || '',
-        l.obs || '',
-        l.recorrente ? 'Sim' : 'Não',
-        l.parcelado ? `${l.parcelaAtual}/${l.nParcelas}` : '',
-      ]),
-    ];
+    nome = 'FinancasPro_Lancamentos_' + MONTHS[state.currentMonth] + state.currentYear + '.csv';
+    rows = [['Tipo','Descrição','Valor (R$)','Categoria','Data','Pagamento','Observação','Recorrente','Parcelas']];
+    getLancamentosMes().forEach(function(l) {
+      rows.push([l.tipo, l.descricao, (l.valor||0).toFixed(2).replace('.',','),
+        l.categoria, l.data, l.pagamento||'', l.obs||'',
+        l.recorrente?'Sim':'Não', l.parcelado?(l.parcelaAtual+'/'+l.nParcelas):'']);
+    });
   } else if (tipo === 'cartoes') {
-    nome = `FinancasPro_Cartoes_${state.currentYear}.csv`;
-    rows = [
-      ['Nome','Limite (R$)','Dia Fechamento','Dia Vencimento'],
-      ...state.cartoes.map(c => [
-        c.nome,
-        (c.limite || 0).toFixed(2).replace('.', ','),
-        c.fechamento,
-        c.vencimento,
-      ]),
-    ];
+    nome = 'FinancasPro_Cartoes_' + state.currentYear + '.csv';
+    rows = [['Nome','Limite (R$)','Dia Fechamento','Dia Vencimento']];
+    state.cartoes.forEach(function(c) {
+      rows.push([c.nome, (c.limite||0).toFixed(2).replace('.',','), c.fechamento, c.vencimento]);
+    });
   } else if (tipo === 'anual') {
-    nome = `FinancasPro_Anual_${state.currentYear}.csv`;
+    nome = 'FinancasPro_Anual_' + state.currentYear + '.csv';
     rows = [['Mês','Receita (R$)','Despesa (R$)','Saldo (R$)','Taxa Economia']];
-    for (let m = 0; m < 12; m++) {
-      const it   = getLancamentosMes(m, state.currentYear);
-      const rec  = sumBy(it, 'receita');
-      const desp = sumBy(it, 'despesa');
-      const sal  = rec - desp;
-      const taxa = rec > 0 ? Math.round((sal / rec) * 100) : 0;
-      rows.push([
-        `${MONTHS[m]}/${state.currentYear}`,
-        rec.toFixed(2).replace('.', ','),
-        desp.toFixed(2).replace('.', ','),
-        sal.toFixed(2).replace('.', ','),
-        `${taxa}%`,
-      ]);
+    for (var m = 0; m < 12; m++) {
+      var it = getLancamentosMes(m, state.currentYear);
+      var rec = sumBy(it,'receita'), desp = sumBy(it,'despesa'), sal = rec-desp;
+      var taxa = rec>0 ? Math.round((sal/rec)*100) : 0;
+      rows.push([MONTHS[m]+'/'+state.currentYear,
+        rec.toFixed(2).replace('.',','), desp.toFixed(2).replace('.',','),
+        sal.toFixed(2).replace('.',','), taxa+'%']);
     }
   }
 
   if (!rows.length) { alert('Nenhum dado para exportar.'); return; }
-
-  const csv  = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\r\n');
-  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href = url; a.download = nome; document.body.appendChild(a); a.click();
+  var csv  = rows.map(function(r){ return r.map(function(v){ return '"'+String(v).replace(/"/g,'""')+'"'; }).join(';'); }).join('\r\n');
+  var blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  var url  = URL.createObjectURL(blob);
+  var a    = document.createElement('a');
+  a.href = url; a.download = nome;
+  document.body.appendChild(a); a.click();
   document.body.removeChild(a); URL.revokeObjectURL(url);
 }
 
@@ -2104,19 +2191,16 @@ function exportarCSV(tipo) {
 // EXPORTAR BACKUP JSON
 // ══════════════════════════════════════════════════
 function exportarDados() {
-  const backup = {
-    version:      '2.0',
-    exportadoEm:  new Date().toISOString(),
-    usuario:      state.user?.email || '',
-    lancamentos:  state.lancamentos,
-    cartoes:      state.cartoes,
+  var backup = {
+    version: '2.0', exportadoEm: new Date().toISOString(),
+    usuario: state.user ? state.user.email : '',
+    lancamentos: state.lancamentos, cartoes: state.cartoes,
   };
-  const json = JSON.stringify(backup, null, 2);
-  const blob = new Blob([json], { type: 'application/json' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
-  a.download = `FinancasPro_Backup_${new Date().toISOString().split('T')[0]}.json`;
+  var blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+  var url  = URL.createObjectURL(blob);
+  var a    = document.createElement('a');
+  a.href = url;
+  a.download = 'FinancasPro_Backup_' + new Date().toISOString().split('T')[0] + '.json';
   document.body.appendChild(a); a.click();
   document.body.removeChild(a); URL.revokeObjectURL(url);
 }
@@ -2126,12 +2210,8 @@ function exportarDados() {
 // ══════════════════════════════════════════════════
 function limparDados() {
   if (!confirm('⚠️ Isso apagará TODOS os lançamentos e cartões do armazenamento local.\n\nOs dados no Google Sheets permanecem intactos.\n\nDeseja continuar?')) return;
-  if (!confirm('Confirmar: apagar dados locais?')) return;
-  state.lancamentos = [];
-  state.cartoes     = [];
-  saveLocal();
-  destroyAllCharts();
-  renderAll();
-  updateConfigPanel();
+  if (!confirm('Confirmar: apagar dados locais definitivamente?')) return;
+  state.lancamentos = []; state.cartoes = [];
+  saveLocal(); destroyAllCharts(); renderAll(); updateConfigPanel();
   alert('✅ Dados locais apagados.\nUse "Sincronizar ↓" para recarregar do Google Sheets.');
 }
