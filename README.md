@@ -20,7 +20,7 @@ financaspro/
 
 ---
 
-## 1. GitHub Pages
+## 1. GitHub Pages 
 
 1. Crie o repositório: `github.com/SEU_USUARIO/financaspro`
 2. Faça upload de todos os arquivos **exceto** `Codigo.gs`
