@@ -18,7 +18,6 @@ const DRIVE_API  = 'https://www.googleapis.com/drive/v3/files';
 const OAUTH_SCOPES = [
   'https://www.googleapis.com/auth/spreadsheets',
   'https://www.googleapis.com/auth/drive.file',
-  'https://www.googleapis.com/auth/drive.readonly',
 ].join(' ');
 
 
@@ -462,6 +461,17 @@ async function criarPlanilhaCliente() {
       }),
     });
     const data = await res.json();
+    if (data.error) {
+      const apiMsg = data.error.message || JSON.stringify(data.error);
+      addSyncLog('Erro Google API (' + (data.error.code||'?') + '): ' + apiMsg, 'error');
+      if (data.error.code === 403 || (apiMsg && apiMsg.includes('not been used'))) {
+        addSyncLog('Acesse console.cloud.google.com → APIs e Serviços → Ative: Google Sheets API e Google Drive API', 'warn');
+      }
+      if (data.error.code === 401) {
+        addSyncLog('Token inválido. Faça logout e login novamente.', 'warn');
+      }
+      return null;
+    }
     if (!data.spreadsheetId) throw new Error('Falha ao criar planilha');
     const sid = data.spreadsheetId;
 
@@ -1823,11 +1833,10 @@ function salvarConfig() {
 // NAVEGAÇÃO — TABS (com transição Finn)
 // ══════════════════════════════════════════════════
 function switchTab(tab) {
-  // Transição visual entre abas
+  // Transição visual — mostra Finn antes dos renders pesados
   const cfg = getConfig();
-  if (cfg.finnAtivo !== false && $('finnTransition')) {
-    showFinnTransition();
-  }
+  const temFinn = cfg.finnAtivo !== false && $('finnTransition');
+  if (temFinn) showFinnTransition();
 
   document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
@@ -1840,15 +1849,19 @@ function switchTab(tab) {
 
   if ($('topbarTitle')) $('topbarTitle').textContent = TAB_TITLES[tab] || tab;
 
-  if (tab === 'relatorios')     renderRelatorio();
-  if (tab === 'comparativo')    renderComparativo();
-  if (tab === 'dre')            renderDRE();
-  if (tab === 'caixinhas')      renderCaixinhas();
-  if (tab === 'analise-cartao') renderAnaliseCartao();
-  if (tab === 'fluxo')          renderFluxo();
-  if (tab === 'configuracoes')  updateConfigPanel();
-
   closeSidebar();
+
+  // Delay nos renders pesados para a animação do Finn ter tempo de rodar
+  const delay = temFinn ? 300 : 0;
+  setTimeout(function() {
+    if (tab === 'relatorios')     renderRelatorio();
+    if (tab === 'comparativo')    renderComparativo();
+    if (tab === 'dre')            renderDRE();
+    if (tab === 'caixinhas')      renderCaixinhas();
+    if (tab === 'analise-cartao') renderAnaliseCartao();
+    if (tab === 'fluxo')          renderFluxo();
+    if (tab === 'configuracoes')  updateConfigPanel();
+  }, delay);
 }
 
 // ══════════════════════════════════════════════════
@@ -1884,7 +1897,7 @@ function showFinnTransition() {
   if (!ft) return;
   if (ftm) ftm.textContent = msg;
   ft.style.display = 'flex';
-  setTimeout(() => { ft.style.display = 'none'; }, 900);
+  setTimeout(() => { ft.style.display = 'none'; }, 1800);
 }
 
 // ══════════════════════════════════════════════════
