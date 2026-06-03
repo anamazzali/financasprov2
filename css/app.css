@@ -1056,3 +1056,74 @@ h1,h2,h3,h4,h5 { font-family: 'Sora', sans-serif; font-weight: 700; }
 .btn-export:hover { background:var(--bege-escuro); color:var(--texto-escuro); }
 .btn-export-green { background:rgba(27,122,62,0.08); border-color:rgba(27,122,62,0.25); color:var(--verde-medio); }
 .btn-export-green:hover { background:var(--verde-medio); color:#fff; }
+
+
+/* ══ BADGE INÍCIO — Comece Aqui ══ */
+.badge-inicio {
+  display: inline-block;
+  background: var(--dourado, #D4AF37);
+  color: #1B4332;
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 2px 6px;
+  border-radius: 20px;
+  margin-left: 6px;
+  animation: pulse-badge 1.8s ease-in-out infinite;
+  vertical-align: middle;
+}
+@keyframes pulse-badge {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.7; transform: scale(1.08); }
+}
+.nav-item-comece {
+  border: 1.5px dashed var(--dourado, #D4AF37) !important;
+  border-radius: 8px !important;
+}
+
+/* ══ RESPONSIVE — ajustes mobile ══ */
+@media (max-width: 480px) {
+  /* Login: imagem/card centralizado, botão proporcional */
+  .login-card {
+    padding: 28px 20px 24px;
+    margin: 16px;
+    width: calc(100% - 32px);
+  }
+  .login-logo-wrap { margin-bottom: 12px; }
+  .login-owl { font-size: 2.8rem; }
+  .login-title { font-size: 1.4rem; }
+  .login-sub   { font-size: 0.82rem; }
+  /* Força botão Google a não estourar a tela */
+  #googleBtnWrap, #googleBtnWrap > *, .g_id_signin {
+    width: 100% !important;
+    max-width: 280px !important;
+  }
+  .login-info-list { gap: 8px; }
+  .login-info-item { font-size: 0.78rem; }
+
+  /* KPI cards: 2 colunas no mobile */
+  .cards-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+  .kpi-val { font-size: 1rem !important; }
+
+  /* Insights: 1 coluna */
+  .insights-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Charts: 1 coluna */
+  .charts-row {
+    flex-direction: column !important;
+  }
+  .chart-box { width: 100% !important; }
+
+  /* Topbar */
+  .topbar-month span { font-size: 0.78rem; }
+
+  /* Relatório anual top5: 1 coluna no mobile */
+  #relatorioAnualContent > div > div:last-child {
+    grid-template-columns: 1fr !important;
+  }
+}
