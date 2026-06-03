@@ -330,6 +330,11 @@ function initApp() {
     loadFromSheets();
   }
   setTimeout(showFinn, 1200);
+  // Primeira visita — abre Comece Aqui automaticamente
+  if (!localStorage.getItem('fp_visitou')) {
+    localStorage.setItem('fp_visitou', '1');
+    setTimeout(() => switchTab('comece'), 400);
+  }
 }
 
 // ══════════════════════════════════════════════════
@@ -599,6 +604,8 @@ async function loadFromSheets() {
         recorrente: String(r[8]||'').toUpperCase() === 'TRUE',
         cartaoId:   String(r[9]||''),
       }));
+    } else {
+      state.lancamentos = []; // planilha vazia — limpa dados locais
     }
     // Lê cartões
     const rowsC = await fpSheetsLer('💳 Cartões');
@@ -612,6 +619,8 @@ async function loadFromSheets() {
         cor:        String(r[5]||'#2D6A4F'),
         corCustom:  String(r[6]||'').toUpperCase() === 'TRUE',
       }));
+    } else {
+      state.cartoes = []; // planilha vazia — limpa cartões locais
     }
     saveLocal();
     renderAll();
@@ -789,6 +798,104 @@ function renderDashboard() {
   renderCatChart(byCat,despesa);
   renderMensalChart();
   renderCatTable(byCat,despesa);
+  renderRelatorioAnual();
+}
+
+// ══════════════════════════════════════════════════
+// RELATÓRIO ANUAL — aparece abaixo do Dashboard
+// ══════════════════════════════════════════════════
+function renderRelatorioAnual() {
+  const el = $('relatorioAnualContent');
+  if (!el) return;
+  const ano = state.currentYear;
+  let totalRec = 0, totalDesp = 0;
+  const catDesp = {}, catRec = {};
+
+  // Acumula dados de Jan a Dez
+  const rows = [];
+  for (let m = 0; m < 12; m++) {
+    const it  = getLancamentosMes(m, ano);
+    const rec = sumBy(it, 'receita');
+    const desp = sumBy(it, 'despesa');
+    totalRec  += rec;
+    totalDesp += desp;
+    it.filter(l => l.tipo === 'despesa').forEach(l => {
+      catDesp[l.categoria] = (catDesp[l.categoria] || 0) + parseFloat(l.valor || 0);
+    });
+    it.filter(l => l.tipo === 'receita').forEach(l => {
+      catRec[l.categoria] = (catRec[l.categoria] || 0) + parseFloat(l.valor || 0);
+    });
+    rows.push({ mes: MONTHS[m], rec, desp, saldo: rec - desp });
+  }
+
+  const saldoAnual = totalRec - totalDesp;
+  const taxaAnual  = totalRec > 0 ? Math.round((saldoAnual / totalRec) * 100) : 0;
+
+  // Top 5 despesas por categoria
+  const top5Desp = Object.entries(catDesp).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  // Top 5 receitas por categoria
+  const top5Rec  = Object.entries(catRec).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+  el.innerHTML = `
+    <div style="margin-top:28px;border-top:2px solid var(--bege-escuro);padding-top:24px;">
+      <h3 class="chart-title" style="font-size:1rem;margin-bottom:16px;">📅 Relatório Anual — ${ano}</h3>
+
+      <!-- KPIs anuais -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;">
+        <div style="background:#fff;border:1px solid var(--bege-escuro);border-radius:var(--radius);border-top:4px solid var(--verde-positivo);padding:14px;text-align:center;">
+          <div style="font-size:0.65rem;font-weight:800;text-transform:uppercase;color:var(--texto-medio);margin-bottom:6px;">💰 Receita Anual</div>
+          <div style="font-size:1.1rem;font-weight:800;color:var(--verde-positivo);">${fmt(totalRec)}</div>
+        </div>
+        <div style="background:#fff;border:1px solid var(--bege-escuro);border-radius:var(--radius);border-top:4px solid var(--vermelho);padding:14px;text-align:center;">
+          <div style="font-size:0.65rem;font-weight:800;text-transform:uppercase;color:var(--texto-medio);margin-bottom:6px;">💸 Despesa Anual</div>
+          <div style="font-size:1.1rem;font-weight:800;color:var(--vermelho);">${fmt(totalDesp)}</div>
+        </div>
+        <div style="background:#fff;border:1px solid var(--bege-escuro);border-radius:var(--radius);border-top:4px solid ${saldoAnual>=0?'var(--verde-medio)':'var(--vermelho)'};padding:14px;text-align:center;">
+          <div style="font-size:0.65rem;font-weight:800;text-transform:uppercase;color:var(--texto-medio);margin-bottom:6px;">🏦 Saldo Anual</div>
+          <div style="font-size:1.1rem;font-weight:800;color:${saldoAnual>=0?'var(--verde-medio)':'var(--vermelho)'};">${fmt(saldoAnual)}</div>
+        </div>
+      </div>
+
+      <!-- Tabela Jan-Dez -->
+      <div class="table-box" style="margin-bottom:20px;">
+        <table class="data-table">
+          <thead><tr><th>Mês</th><th>Receita</th><th>Despesa</th><th>Saldo</th></tr></thead>
+          <tbody>
+            ${rows.map(r => `
+              <tr${r.mes === MONTHS[state.currentMonth] ? ' style="background:rgba(27,106,79,0.07);font-weight:700;"' : ''}>
+                <td>${r.mes}${r.mes === MONTHS[state.currentMonth] ? ' ◀' : ''}</td>
+                <td style="color:var(--verde-positivo);font-weight:600;">${r.rec > 0 ? fmt(r.rec) : '—'}</td>
+                <td style="color:var(--vermelho);font-weight:600;">${r.desp > 0 ? fmt(r.desp) : '—'}</td>
+                <td style="font-weight:700;color:${r.saldo >= 0 ? 'var(--verde-medio)' : 'var(--vermelho)'};">${fmt(r.saldo)}</td>
+              </tr>`).join('')}
+          </tbody>
+          <tfoot>
+            <tr style="background:var(--bege);font-weight:800;">
+              <td>TOTAL ${ano}</td>
+              <td style="color:var(--verde-positivo);">${fmt(totalRec)}</td>
+              <td style="color:var(--vermelho);">${fmt(totalDesp)}</td>
+              <td style="color:${saldoAnual>=0?'var(--verde-medio)':'var(--vermelho)'};">${fmt(saldoAnual)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <!-- Top 5 -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div class="table-box">
+          <h3 class="chart-title" style="font-size:0.85rem;">🔴 Top 5 Despesas por Categoria (${ano})</h3>
+          <ul class="rel-list">${top5Desp.length
+            ? top5Desp.map(([c,v]) => `<li><span>${CAT_ICONS[c]||'📦'} ${c}</span><span class="rel-amount despesa">${fmt(v)}</span></li>`).join('')
+            : '<li><span style="color:var(--texto-medio);">—</span></li>'}</ul>
+        </div>
+        <div class="table-box">
+          <h3 class="chart-title" style="font-size:0.85rem;">🟢 Top 5 Receitas por Categoria (${ano})</h3>
+          <ul class="rel-list">${top5Rec.length
+            ? top5Rec.map(([c,v]) => `<li><span>${CAT_ICONS[c]||'💚'} ${c}</span><span class="rel-amount receita">${fmt(v)}</span></li>`).join('')
+            : '<li><span style="color:var(--texto-medio);">—</span></li>'}</ul>
+        </div>
+      </div>
+    </div>`;
 }
 
 function renderCatChart(byCat,total) {
@@ -922,12 +1029,15 @@ function openModal(edit=null) {
 function closeModal(){$('modal').style.display='none';}
 
 function toggleCartaoRow() {
-  const show = $('fPagamento').value.includes('Crédito');
+  const isCredito = $('fPagamento').value.includes('Crédito');
+  const isReceita = $('fTipo').value === 'receita';
+  const show = isCredito;
   $('cartaoRow').style.display = show ? 'flex' : 'none';
-  $('parcelamentoRow').style.display = show ? 'block' : 'none';
-  if (!show) {
-    $('fParcelado').checked = false;
-    $('parcelamentoCampos').style.display = 'none';
+  // Parcelamento: só para despesas no cartão de crédito
+  $('parcelamentoRow').style.display = (show && !isReceita) ? 'block' : 'none';
+  if (!show || isReceita) {
+    if ($('fParcelado')) $('fParcelado').checked = false;
+    if ($('parcelamentoCampos')) $('parcelamentoCampos').style.display = 'none';
   }
   if (show) {
     $('fCartao').innerHTML = state.cartoes.length
@@ -1015,6 +1125,7 @@ function calcularParcelamento() {
 function updateCategorias() {
   const cats=$('fTipo').value==='receita'?CATEGORIAS_RECEITA:CATEGORIAS_DESPESA;
   $('fCategoria').innerHTML=cats.map(c=>`<option value="${c}">${c}</option>`).join('');
+  toggleCartaoRow(); // recalcula visibilidade do parcelamento ao mudar tipo
 }
 function saveLancamento() {
   const tipo=$('fTipo').value, desc=$('fDesc').value.trim();
