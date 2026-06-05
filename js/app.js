@@ -351,9 +351,11 @@ function _inicializarTokenClient() {
         state.accessToken = tokenResponse.access_token;
         state.tokenExpiry = Date.now() + (tokenResponse.expires_in - 60) * 1000;
         localStorage.setItem('fp_token_expiry', state.tokenExpiry);
+        sessionStorage.setItem('fp_access_token', state.accessToken);
+        sessionStorage.setItem('fp_token_expiry', String(state.tokenExpiry));
         console.log('[Auth] Token OAuth obtido — Sheets API disponível');
-        // Após obter token, configura a planilha da cliente
-        setupSheetsCliente();
+        // Nota: setupSheetsCliente() é chamado apenas em ações explícitas (Enviar/Sincronizar)
+        // para evitar que loadFromSheets() sobrescreva dados locais não sincronizados
       }
     },
   });
@@ -392,13 +394,6 @@ function initApp() {
   populateCatFilter();
   updateCategorias();
   renderAll();
-  // Tenta token silencioso em background — sem popup
-  setTimeout(async () => {
-    if (state.tokenClient) {
-      const ok = await garantirToken(false); // silent
-      if (ok) setupSheetsCliente();
-    }
-  }, 800);
   setTimeout(showFinn, 1200);
   // Primeira visita — abre Comece Aqui automaticamente
   if (!localStorage.getItem('fp_visitou')) {
@@ -466,6 +461,14 @@ function sheetsPOST(body) {
 // true  = abre popup do Google para o usuário autorizar (só em ações explícitas)
 async function garantirToken(forcarPopup = false) {
   if (state.accessToken && Date.now() < state.tokenExpiry) return true;
+  // Tenta restaurar da sessionStorage — persiste enquanto a aba estiver aberta (sem popup)
+  const sessToken  = sessionStorage.getItem('fp_access_token');
+  const sessExpiry = parseInt(sessionStorage.getItem('fp_token_expiry') || '0');
+  if (sessToken && Date.now() < sessExpiry) {
+    state.accessToken = sessToken;
+    state.tokenExpiry = sessExpiry;
+    return true;
+  }
   if (!forcarPopup || !state.tokenClient) return false;
   return new Promise((resolve) => {
     const prev = state.tokenClient.callback;
@@ -474,6 +477,8 @@ async function garantirToken(forcarPopup = false) {
       if (resp && resp.access_token) {
         state.accessToken = resp.access_token;
         state.tokenExpiry = Date.now() + (resp.expires_in - 60) * 1000;
+        sessionStorage.setItem('fp_access_token', state.accessToken);
+        sessionStorage.setItem('fp_token_expiry', String(state.tokenExpiry));
         resolve(true);
       } else { resolve(false); }
     };
@@ -496,7 +501,7 @@ async function fpSheetsEscrever(aba, valores) {
     return false;
   }
   try {
-    const range = encodeURIComponent(`${aba}!A1`);
+    const range = encodeURIComponent(`'${aba}'!A1`);
     const res = await fetch(
       `${SHEETS_API}/${state.sheetsId}/values/${range}?valueInputOption=RAW`,
       {
@@ -527,6 +532,26 @@ async function fpSheetsEscrever(aba, valores) {
   }
 }
 
+// Verifica quais abas existem e cria as que faltam
+async function _garantirAbas(nomes) {
+  if (!state.sheetsId || !state.accessToken || Date.now() >= state.tokenExpiry) return;
+  try {
+    const res = await fetch(
+      `${SHEETS_API}/${state.sheetsId}?fields=sheets(properties(title))`,
+      { headers: { 'Authorization': `Bearer ${state.accessToken}` } }
+    );
+    if (!res.ok) return;
+    const data = await res.json();
+    const existentes = (data.sheets || []).map(s => s.properties.title);
+    for (const nome of nomes) {
+      if (!existentes.includes(nome)) {
+        addSyncLog(`Criando aba "${nome}"...`, 'info');
+        await _criarAba(nome);
+      }
+    }
+  } catch(e) { console.warn('_garantirAbas:', e); }
+}
+
 // Cria uma aba na planilha se não existir
 async function _criarAba(titulo) {
   try {
@@ -542,7 +567,7 @@ async function _criarAba(titulo) {
 async function fpSheetsLer(aba) {
   if (!state.sheetsId || !await garantirToken()) return [];
   try {
-    const range = encodeURIComponent(`${aba}!A:Z`);
+    const range = encodeURIComponent(`'${aba}'!A:Z`);
     const res  = await fetch(
       `${SHEETS_API}/${state.sheetsId}/values/${range}`,
       { headers: { 'Authorization': `Bearer ${state.accessToken}` } }
@@ -585,8 +610,8 @@ async function criarPlanilhaCliente() {
         body: JSON.stringify({
           valueInputOption: 'RAW',
           data: [
-            { range: '💰 Lançamentos!A1', values: [CAB_LANC] },
-            { range: '💳 Cartões!A1',     values: [CAB_CART] },
+            { range: "'💰 Lançamentos'!A1", values: [CAB_LANC] },
+            { range: "'💳 Cartões'!A1",     values: [CAB_CART] },
           ]
         }),
       }
@@ -619,14 +644,13 @@ async function setupSheetsCliente() {
     localStorage.setItem('fp_sheets_id_' + state.user.email, state.sheetsId);
   }
 
-  // Verifica se precisa migrar dados antigos (1ª vez após atualização)
+  // Migração única (apenas na primeira vez após atualização)
   const jaMigrou = localStorage.getItem('fp_migrado_' + state.user.email);
   if (!jaMigrou) {
     await migrarDadosAntigos();
-  } else {
-    // Login normal — carrega da planilha da cliente
-    await loadFromSheets();
   }
+  // loadFromSheets() NÃO é chamado aqui — evita sobrescrever dados locais não sincronizados.
+  // Use o botão "Sincronizar ↓" para baixar dados do Sheets explicitamente.
 }
 
 // ══════════════════════════════════════════════════
@@ -680,6 +704,9 @@ async function _syncParaSheetsCliente() {
     addSyncLog('Sem token OAuth. Use o botão "Enviar ↑" em Configurações para reautorizar.', 'warn');
     return false;
   }
+
+  // Garante que as abas existem antes de tentar escrever
+  await _garantirAbas(['💰 Lançamentos', '💳 Cartões']);
 
   const rowsLanc = [CAB_LANC, ...state.lancamentos.map(l => [
     l.id||'', l.tipo||'', l.descricao||'', l.valor||0, l.categoria||'',
@@ -1380,8 +1407,8 @@ function saveLancamento() {
   const valor=parseFloat($('fValor').value), cat=$('fCategoria').value;
   const data=$('fData').value, pag=$('fPagamento').value;
   const obs=$('fObs').value.trim(), rec=$('fRecorrente').checked;
-  if(!desc||isNaN(valor)||valor<=0||!data||!cat){
-    alert('Preencha todos os campos obrigatórios.');return;
+  if(isNaN(valor)||valor<=0||!data||!cat){
+    alert('Preencha os campos obrigatórios: Valor, Categoria e Data.');return;
   }
   // Dados de parcelamento
   const parcelado = $('fParcelado')?.checked && pag.includes('Crédito');
@@ -2413,6 +2440,13 @@ window.addEventListener('DOMContentLoaded', function() {
     // Usuário já cadastrado — entra automaticamente
     state.user     = user;
     state.sheetsId = localStorage.getItem('fp_sheets_id_' + user.email) || null;
+    // Restaura token OAuth da sessionStorage (evita popup desnecessário)
+    const sessToken  = sessionStorage.getItem('fp_access_token');
+    const sessExpiry = parseInt(sessionStorage.getItem('fp_token_expiry') || '0');
+    if (sessToken && Date.now() < sessExpiry) {
+      state.accessToken = sessToken;
+      state.tokenExpiry = sessExpiry;
+    }
     // Aguarda Google SDK carregar para inicializar token (silencioso)
     function tryInit() {
       if (window.google && google.accounts && google.accounts.oauth2) {
