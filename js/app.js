@@ -84,17 +84,36 @@ function getCorBanco(nome) {
 // ══════════════════════════════════════════════════
 // CATEGORIAS
 // ══════════════════════════════════════════════════
-const CATEGORIAS_DESPESA = [
+// Categorias padrão (fallback)
+const _CATS_DESP_DEFAULT = [
   'Moradia','Educação','Transporte','Seguros','Alimentação','Pet',
   'Cuidados Pessoais','Entretenimento',
   'Investimentos Curto Prazo','Investimentos Longo Prazo',
   'Empréstimos','Igreja/Religião','Impostos',
   'Presentes','Doações','Jurídico','Saúde',
 ];
-const CATEGORIAS_RECEITA = [
+const _CATS_REC_DEFAULT = [
   'Salário','Renda Extra','Freelance','Investimentos',
   'Vale Alimentação','Vale Transporte','Outros',
 ];
+// Carrega do localStorage (permite edição pelo usuário)
+function getCatDespesa() {
+  try { const s=localStorage.getItem('fp_cats_despesa'); return s?JSON.parse(s):_CATS_DESP_DEFAULT; } catch(e){return _CATS_DESP_DEFAULT;}
+}
+function getCatReceita() {
+  try { const s=localStorage.getItem('fp_cats_receita'); return s?JSON.parse(s):_CATS_REC_DEFAULT; } catch(e){return _CATS_REC_DEFAULT;}
+}
+function saveCats(despesa, receita) {
+  localStorage.setItem('fp_cats_despesa', JSON.stringify(despesa));
+  localStorage.setItem('fp_cats_receita', JSON.stringify(receita));
+}
+// Mantém as constantes para compatibilidade com restante do código
+let CATEGORIAS_DESPESA = getCatDespesa();
+let CATEGORIAS_RECEITA = getCatReceita();
+function reloadCats() {
+  CATEGORIAS_DESPESA = getCatDespesa();
+  CATEGORIAS_RECEITA = getCatReceita();
+}
 const CAT_ICONS = {
   'Moradia':'🏠','Educação':'📚','Transporte':'🚗','Seguros':'🛡️',
   'Alimentação':'🍽️','Pet':'🐾','Cuidados Pessoais':'💆',
@@ -108,7 +127,7 @@ const CAT_ICONS = {
 };
 
 // Caixinhas — categorias por grupo
-const CAIXINHAS = [
+const _CAIXINHAS_DEFAULT = [
   { key:'necessidades', label:'Necessidades',          pct:50, cor:'#C0392B', icon:'🏠',
     cats:['Moradia','Alimentação','Transporte','Saúde','Seguros','Impostos','Empréstimos','Cuidados Pessoais','Pet','Jurídico'] },
   { key:'doacao',       label:'Doação / Contribuição', pct:10, cor:'#D4AF37', icon:'❤️',
@@ -122,6 +141,57 @@ const CAIXINHAS = [
   { key:'invest_curto', label:'Invest. Curto Prazo',   pct:10, cor:'#A07820', icon:'📈',
     cats:['Investimentos Curto Prazo'] },
 ];
+function getCaixinhas() {
+  try { const s=localStorage.getItem('fp_caixinhas'); return s?JSON.parse(s):JSON.parse(JSON.stringify(_CAIXINHAS_DEFAULT)); }
+  catch(e) { return JSON.parse(JSON.stringify(_CAIXINHAS_DEFAULT)); }
+}
+function saveCaixinhasConfig(arr) { localStorage.setItem('fp_caixinhas', JSON.stringify(arr)); }
+let CAIXINHAS = getCaixinhas();
+
+// ── Edição de caixinhas ──────────────────────────────────────────────────────
+function openCaixinhasEdit() {
+  const cx = getCaixinhas();
+  const rows = cx.map((c,i) => `
+    <div class="cxedit-row">
+      <span class="cxedit-icon">${c.icon}</span>
+      <div class="cxedit-fields">
+        <input type="text" class="cxedit-nome" data-idx="${i}" value="${escHtml(c.label)}" placeholder="Nome" />
+        <div style="display:flex;align-items:center;gap:6px;">
+          <input type="number" class="cxedit-pct" data-idx="${i}" value="${c.pct}" min="1" max="100" style="width:70px;" />
+          <span style="font-size:0.8rem;color:var(--texto-medio);">%</span>
+          <input type="color" class="cxedit-cor" data-idx="${i}" value="${c.cor}" style="width:40px;height:32px;border:none;cursor:pointer;border-radius:6px;" />
+        </div>
+      </div>
+    </div>`).join('');
+  const el = $('cxEditContent');
+  if (el) el.innerHTML = rows;
+  $('cxEditModal').style.display = 'flex';
+}
+function closeCaixinhasEdit() { $('cxEditModal').style.display='none'; }
+function saveCaixinhasEdit() {
+  const cx = getCaixinhas();
+  document.querySelectorAll('.cxedit-row').forEach((row, i) => {
+    const nomeEl = row.querySelector('.cxedit-nome');
+    const pctEl  = row.querySelector('.cxedit-pct');
+    const corEl  = row.querySelector('.cxedit-cor');
+    if (nomeEl && pctEl && corEl && cx[i]) {
+      cx[i].label = nomeEl.value.trim() || cx[i].label;
+      cx[i].pct   = parseInt(pctEl.value) || cx[i].pct;
+      cx[i].cor   = corEl.value;
+    }
+  });
+  saveCaixinhasConfig(cx);
+  CAIXINHAS = getCaixinhas();
+  closeCaixinhasEdit();
+  renderCaixinhas();
+}
+function resetCaixinhas() {
+  if (!confirm('Restaurar as caixinhas para os valores padrão?')) return;
+  localStorage.removeItem('fp_caixinhas');
+  CAIXINHAS = getCaixinhas();
+  closeCaixinhasEdit();
+  renderCaixinhas();
+}
 
 const CHART_COLORS = ['#2D6A4F','#D4AF37','#52B788','#F0CB5E','#1B4332','#A07820','#95D5B2','#E8DFC8','#1B7A3E','#C0392B'];
 const MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -322,13 +392,13 @@ function initApp() {
   populateCatFilter();
   updateCategorias();
   renderAll();
-  // Solicita token OAuth para Sheets API (abre popup Google se necessário)
-  if (state.tokenClient) {
-    state.tokenClient.requestAccessToken();
-  } else {
-    // Fallback: tenta sem token (dados locais)
-    loadFromSheets();
-  }
+  // Tenta token silencioso em background — sem popup
+  setTimeout(async () => {
+    if (state.tokenClient) {
+      const ok = await garantirToken(false); // silent
+      if (ok) setupSheetsCliente();
+    }
+  }, 800);
   setTimeout(showFinn, 1200);
   // Primeira visita — abre Comece Aqui automaticamente
   if (!localStorage.getItem('fp_visitou')) {
@@ -391,9 +461,12 @@ function sheetsPOST(body) {
 // ══════════════════════════════════════════════════
 // OAUTH — token para Sheets API da cliente
 // ══════════════════════════════════════════════════
-async function garantirToken() {
+// garantirToken(forcarPopup=false)
+// false = retorna false imediatamente se não houver token em cache (sem popup)
+// true  = abre popup do Google para o usuário autorizar (só em ações explícitas)
+async function garantirToken(forcarPopup = false) {
   if (state.accessToken && Date.now() < state.tokenExpiry) return true;
-  if (!state.tokenClient) return false;
+  if (!forcarPopup || !state.tokenClient) return false;
   return new Promise((resolve) => {
     const prev = state.tokenClient.callback;
     state.tokenClient.callback = (resp) => {
@@ -417,7 +490,11 @@ const CAB_LANC  = ['ID','Tipo','Descrição','Valor','Categoria','Data','Observa
 const CAB_CART  = ['ID','Nome','Limite','Fechamento','Vencimento','Cor','CorCustom'];
 
 async function fpSheetsEscrever(aba, valores) {
-  if (!state.sheetsId || !await garantirToken()) return false;
+  if (!state.sheetsId) { addSyncLog('sheetsId não configurado.', 'error'); return false; }
+  if (!state.accessToken || Date.now() >= state.tokenExpiry) {
+    addSyncLog('Token OAuth expirado. Clique em "Enviar" novamente para reautorizar.', 'warn');
+    return false;
+  }
   try {
     const range = encodeURIComponent(`${aba}!A1`);
     const res = await fetch(
@@ -428,8 +505,38 @@ async function fpSheetsEscrever(aba, valores) {
         body:    JSON.stringify({ values: valores }),
       }
     );
+    if (!res.ok) {
+      let errMsg = `HTTP ${res.status}`;
+      try {
+        const errData = await res.json();
+        if (errData.error) errMsg = errData.error.message || errMsg;
+      } catch(_) {}
+      addSyncLog(`Erro ao gravar aba "${aba}": ${errMsg}`, 'error');
+      // Se a aba não existe (404/400), tenta criar e repetir
+      if (res.status === 400 || res.status === 404) {
+        addSyncLog('Tentando criar aba "' + aba + '"...', 'info');
+        const criou = await _criarAba(aba);
+        if (criou) return fpSheetsEscrever(aba, valores);
+      }
+      return false;
+    }
+    return true;
+  } catch(e) {
+    addSyncLog('Erro de rede ao gravar: ' + (e.message || e), 'error');
+    return false;
+  }
+}
+
+// Cria uma aba na planilha se não existir
+async function _criarAba(titulo) {
+  try {
+    const res = await fetch(`${SHEETS_API}/${state.sheetsId}:batchUpdate`, {
+      method:  'POST',
+      headers: { 'Authorization': `Bearer ${state.accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requests: [{ addSheet: { properties: { title: titulo } } }] }),
+    });
     return res.ok;
-  } catch(e) { console.warn('fpSheetsEscrever:', e); return false; }
+  } catch(e) { return false; }
 }
 
 async function fpSheetsLer(aba) {
@@ -568,7 +675,11 @@ async function migrarDadosAntigos() {
 // ══════════════════════════════════════════════════
 
 async function _syncParaSheetsCliente() {
-  if (!state.sheetsId) return false;
+  if (!state.sheetsId) { addSyncLog('Planilha não configurada. Use "Buscar no Drive" primeiro.', 'warn'); return false; }
+  if (!state.accessToken || Date.now() >= state.tokenExpiry) {
+    addSyncLog('Sem token OAuth. Use o botão "Enviar ↑" em Configurações para reautorizar.', 'warn');
+    return false;
+  }
 
   const rowsLanc = [CAB_LANC, ...state.lancamentos.map(l => [
     l.id||'', l.tipo||'', l.descricao||'', l.valor||0, l.categoria||'',
@@ -719,18 +830,20 @@ function getLancamentosAno(y=state.currentYear) {
 // RENDER ALL
 // ══════════════════════════════════════════════════
 function renderAll() {
-  renderDashboard();
-  renderLancamentos();
-  renderCartoes();
+  try { renderDashboard(); }    catch(e) { console.warn('renderDashboard:', e); }
+  try { renderLancamentos(); }  catch(e) { console.warn('renderLancamentos:', e); }
+  try { renderCartoes(); }      catch(e) { console.warn('renderCartoes:', e); }
   const active = document.querySelector('.tab-content[style*="block"]');
   if (active) {
     const id = active.id;
-    if (id==='tab-relatorios')   renderRelatorio();
-    if (id==='tab-comparativo')  renderComparativo();
-    if (id==='tab-caixinhas')    renderCaixinhas();
-    if (id==='tab-dre')          renderDRE();
-    if (id==='tab-analise-cartao') renderAnaliseCartao();
-    if (id==='tab-fluxo')          renderFluxo();
+    try {
+      if (id==='tab-relatorios')     renderRelatorio();
+      if (id==='tab-comparativo')    renderComparativo();
+      if (id==='tab-caixinhas')      renderCaixinhas();
+      if (id==='tab-dre')            renderDRE();
+      if (id==='tab-analise-cartao') renderAnaliseCartao();
+      if (id==='tab-fluxo')          renderFluxo();
+    } catch(e) { console.warn('renderTab:', e); }
   }
 }
 
@@ -954,6 +1067,68 @@ function renderCatTable(byCat,total) {
 }
 
 // ══════════════════════════════════════════════════
+// GERENCIAMENTO DE CATEGORIAS
+// ══════════════════════════════════════════════════
+function openCatModal() {
+  const d = getCatDespesa();
+  const r = getCatReceita();
+  const renderList = (cats, tipo) => cats.map((c,i) => `
+    <div class="cat-item" id="cat-${tipo}-${i}">
+      <span class="cat-item-nome">${escHtml(c)}</span>
+      <div class="cat-item-actions">
+        <button onclick="editCatItem('${tipo}',${i})" class="btn-cat-edit">✏️</button>
+        <button onclick="removeCatItem('${tipo}',${i})" class="btn-cat-del">🗑️</button>
+      </div>
+    </div>`).join('');
+  const el = $('catModalContent');
+  if (el) el.innerHTML = `
+    <div class="cat-section">
+      <div class="cat-section-title">🔴 Categorias de Despesa</div>
+      <div id="catListDesp">${renderList(d,'desp')}</div>
+      <div class="cat-add-row">
+        <input type="text" id="catNewDesp" placeholder="Nova categoria de despesa..." class="cat-input" />
+        <button onclick="addCatItem('desp')" class="btn-cat-add">+ Adicionar</button>
+      </div>
+    </div>
+    <div class="cat-section">
+      <div class="cat-section-title">🟢 Categorias de Receita</div>
+      <div id="catListRec">${renderList(r,'rec')}</div>
+      <div class="cat-add-row">
+        <input type="text" id="catNewRec" placeholder="Nova categoria de receita..." class="cat-input" />
+        <button onclick="addCatItem('rec')" class="btn-cat-add">+ Adicionar</button>
+      </div>
+    </div>`;
+  $('catModal').style.display = 'flex';
+}
+function closeCatModal() { $('catModal').style.display = 'none'; }
+
+function addCatItem(tipo) {
+  const inp = tipo==='desp' ? $('catNewDesp') : $('catNewRec');
+  const nome = inp.value.trim();
+  if (!nome) return;
+  const d = getCatDespesa(), r = getCatReceita();
+  if (tipo==='desp') { if (!d.includes(nome)) d.push(nome); saveCats(d,r); }
+  else               { if (!r.includes(nome)) r.push(nome); saveCats(d,r); }
+  reloadCats(); inp.value=''; openCatModal();
+}
+function removeCatItem(tipo, idx) {
+  if (!confirm('Remover esta categoria?')) return;
+  const d = getCatDespesa(), r = getCatReceita();
+  if (tipo==='desp') { d.splice(idx,1); saveCats(d,r); }
+  else               { r.splice(idx,1); saveCats(d,r); }
+  reloadCats(); openCatModal();
+}
+function editCatItem(tipo, idx) {
+  const d = getCatDespesa(), r = getCatReceita();
+  const atual = tipo==='desp' ? d[idx] : r[idx];
+  const novo = prompt('Novo nome para a categoria:', atual);
+  if (!novo || novo.trim()===atual) return;
+  if (tipo==='desp') { d[idx]=novo.trim(); saveCats(d,r); }
+  else               { r[idx]=novo.trim(); saveCats(d,r); }
+  reloadCats(); openCatModal();
+}
+
+// ══════════════════════════════════════════════════
 // LANÇAMENTOS
 // ══════════════════════════════════════════════════
 function renderLancamentos() {
@@ -962,6 +1137,11 @@ function renderLancamentos() {
   if(tipo) items=items.filter(l=>l.tipo===tipo);
   if(cat)  items=items.filter(l=>l.categoria===cat);
   items.sort((a,b)=>new Date(b.data)-new Date(a.data));
+
+  // View de tabela
+  if (_lancViewTabela) { renderLancamentosTabela(items); return; }
+  if ($('lancamentosTabela')) $('lancamentosTabela').style.display='none';
+  if ($('lancamentosLista')) $('lancamentosLista').style.display='block';
 
   const el=$('lancamentosLista');
   if(!items.length){
@@ -991,6 +1171,54 @@ function renderLancamentos() {
         <button class="btn-icon" onclick="deleteLancamento('${l.id}')" title="Excluir">🗑️</button>
       </div>
     </div>`).join('');
+}
+
+// ══════════════════════════════════════════════════
+// FEATURE 3 — TABELA DE LANÇAMENTOS
+// ══════════════════════════════════════════════════
+let _lancViewTabela = false;
+function toggleLancView() {
+  _lancViewTabela = !_lancViewTabela;
+  const btn = $('btnViewToggle');
+  if (btn) btn.textContent = _lancViewTabela ? '📋 Ver Cards' : '📊 Ver Tabela';
+  renderLancamentos();
+}
+
+function renderLancamentosTabela(items) {
+  const el = $('lancamentosTabela');
+  if (!el) return;
+  el.style.display = 'block';
+  $('lancamentosLista').style.display = 'none';
+  if (!items.length) {
+    el.innerHTML = `<div style="text-align:center;padding:40px;color:var(--texto-medio);">Nenhum lançamento neste mês</div>`;
+    return;
+  }
+  el.innerHTML = `
+    <div style="overflow-x:auto;">
+      <table class="data-table lanc-tabela">
+        <thead>
+          <tr>
+            <th>Tipo</th><th>Descrição</th><th>Categoria</th>
+            <th>Valor</th><th>Data</th><th>Pagamento</th><th>Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${items.map(l => `
+            <tr class="lanc-tabela-row">
+              <td><span class="tipo-badge ${l.tipo}">${l.tipo==='receita'?'💚 Receita':'🔴 Despesa'}</span></td>
+              <td style="font-weight:600;">${escHtml(l.descricao)}</td>
+              <td>${CAT_ICONS[l.categoria]||'📦'} ${escHtml(l.categoria)}</td>
+              <td class="${l.tipo}" style="font-weight:700;">${l.tipo==='receita'?'+':'-'}${fmt(l.valor)}</td>
+              <td style="white-space:nowrap;">${formatDate(l.data)}</td>
+              <td style="font-size:0.8rem;color:var(--texto-medio);">${escHtml(l.pagamento||'—')}</td>
+              <td style="white-space:nowrap;">
+                <button class="btn-icon" onclick="editLancamento('${l.id}')" title="Editar">✏️</button>
+                <button class="btn-icon" onclick="deleteLancamento('${l.id}')" title="Excluir">🗑️</button>
+              </td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
 }
 
 function populateCatFilter() {
@@ -1027,6 +1255,7 @@ function openModal(edit=null) {
   updateCategorias();
   if (edit) $('fCategoria').value = edit.categoria;
   toggleCartaoRow();
+  updateTipoColor();
   if (isParcelado) calcularParcelamento();
   $('modal').style.display = 'flex';
 }
@@ -1126,10 +1355,25 @@ function calcularParcelamento() {
     </div>
   `;
 }
+// FEATURE 1 — Cor dinâmica do seletor de tipo
+function updateTipoColor() {
+  const sel = $('fTipo');
+  if (!sel) return;
+  if (sel.value === 'receita') {
+    sel.style.cssText = 'background:rgba(27,122,62,0.13);border-color:#52B788;color:#1B4332;font-weight:800;border-radius:9px;padding:10px 14px;';
+  } else {
+    sel.style.cssText = 'background:rgba(192,57,43,0.10);border-color:#C0392B;color:#C0392B;font-weight:800;border-radius:9px;padding:10px 14px;';
+  }
+}
+
 function updateCategorias() {
-  const cats=$('fTipo').value==='receita'?CATEGORIAS_RECEITA:CATEGORIAS_DESPESA;
-  $('fCategoria').innerHTML=cats.map(c=>`<option value="${c}">${c}</option>`).join('');
-  toggleCartaoRow(); // recalcula visibilidade do parcelamento ao mudar tipo
+  const cats=$('fTipo').value==='receita'?getCatReceita():getCatDespesa();
+  $('fCategoria').innerHTML=cats.map(c=>`<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('');
+  updateTipoColor();
+  // toggleCartaoRow só quando o modal está aberto
+  if ($('modal') && $('modal').style.display !== 'none') {
+    toggleCartaoRow();
+  }
 }
 function saveLancamento() {
   const tipo=$('fTipo').value, desc=$('fDesc').value.trim();
@@ -1531,27 +1775,34 @@ function renderDRE() {
 // MÉTODO DAS CAIXINHAS
 // ══════════════════════════════════════════════════
 function renderCaixinhas() {
+  CAIXINHAS = getCaixinhas(); // sempre recarrega do localStorage
   const receita=sumBy(getLancamentosMes(),'receita');
   const despesas=getLancamentosMes().filter(l=>l.tipo==='despesa');
   const byCat=getCatTotals(despesas);
 
   const el=$('caixinhasContent');
   const totalDespesa=Object.values(byCat).reduce((s,v)=>s+v,0);
+  const base = receita; // usa a receita real do mês automaticamente
 
-  const receitaInput=$('caixinhaReceita');
-  const base=receitaInput&&receitaInput.value?parseFloat(receitaInput.value):receita;
-
-  el.innerHTML=`
-    <div style="background:#fff;border:1px solid var(--bege-escuro);border-radius:var(--radius);padding:20px;margin-bottom:20px;max-width:600px;">
-      <p style="font-size:0.82rem;color:var(--texto-medio);margin-bottom:8px;font-weight:600;">BASE DE CÁLCULO (Receita Líquida)</p>
-      <div style="display:flex;gap:10px;align-items:center;">
-        <input type="number" id="caixinhaReceita" value="${base||''}" placeholder="Digite sua receita líquida..."
-          oninput="renderCaixinhas()"
-          style="flex:1;padding:10px 14px;border:1.5px solid var(--bege-escuro);border-radius:9px;font-family:Sora,sans-serif;font-size:0.95rem;background:var(--bege-claro);" />
-        <span style="font-size:0.82rem;color:var(--texto-medio);">${receita>0?`Receita do mês: ${fmt(receita)}`:'Sem receita no mês'}</span>
+  // FEATURE 6 — Resumo acima dos valores
+  const resumoAcima = `
+    <div style="background:var(--bege-claro);border:1px solid var(--bege-escuro);border-radius:var(--radius);padding:16px 20px;margin-bottom:20px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <p style="font-size:0.82rem;font-weight:800;color:var(--verde-escuro);margin:0;">📖 O Método das 6 Caixinhas</p>
+        <button onclick="openCaixinhasEdit()" style="background:var(--verde-escuro);color:#fff;border:none;border-radius:8px;padding:5px 12px;font-size:0.75rem;cursor:pointer;font-family:Sora,sans-serif;">✏️ Editar Caixinhas</button>
       </div>
-    </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;">
+        ${CAIXINHAS.map(cx=>`
+          <div style="display:flex;align-items:center;gap:6px;background:#fff;border-left:4px solid ${cx.cor};border-radius:0 8px 8px 0;padding:6px 12px;font-size:0.78rem;">
+            <span>${cx.icon}</span>
+            <span style="font-weight:700;color:var(--verde-escuro);">${cx.pct}%</span>
+            <span style="color:var(--texto-medio);">${escHtml(cx.label)}</span>
+          </div>`).join('')}
+      </div>
+      ${receita>0?`<p style="font-size:0.78rem;color:var(--verde-medio);margin:10px 0 0;font-weight:600;">💰 Base automática: receita do mês = ${fmt(receita)}</p>`:'<p style="font-size:0.78rem;color:var(--texto-medio);margin:10px 0 0;">Lance suas receitas para ver os valores calculados automaticamente.</p>'}
+    </div>`;
 
+  el.innerHTML = resumoAcima + `
     <div class="caixinhas-grid">
       ${CAIXINHAS.map(cx=>{
         const alocado=(base||0)*(cx.pct/100);
@@ -2022,7 +2273,7 @@ async function testarConexao(){
   addSyncLog('Iniciando teste de conexão...','info');
   try{ await fetch(CONFIG.SHEETS_URL+'?action=ping'); addSyncLog('Apps Script: OK ✅','ok'); }
   catch(e){ addSyncLog('Apps Script inacessível.','warn'); }
-  var temToken=await garantirToken();
+  var temToken=await garantirToken(true);
   if(!temToken){ addSyncLog('Token OAuth inválido. Faça logout e login novamente.','error'); if(st){st.textContent='❌ Sem token';st.style.color='#C0392B';} return; }
   addSyncLog('Token OAuth: válido ✅','ok');
   if(state.sheetsId){ addSyncLog('Planilha: '+state.sheetsId.substring(0,22)+'...','ok'); if(st){st.textContent='✅ Tudo conectado';st.style.color='#1B7A3E';} }
@@ -2034,7 +2285,7 @@ async function sincronizarAgora(){
   if($('syncLog')){ $('syncLog').innerHTML=''; $('syncLog').style.display='none'; }
   addSyncLog('Baixando dados do Sheets...','info');
   if(!state.sheetsId){ addSyncLog('Planilha não configurada. Use "Buscar no Drive" primeiro.','warn'); return; }
-  if(!await garantirToken()){ addSyncLog('Sem token OAuth. Faça logout e login novamente.','error'); return; }
+  if(!await garantirToken(true)){ addSyncLog('Sem token OAuth. Clique novamente para tentar.','error'); return; }
   await loadFromSheets();
   var agora=new Date().toISOString();
   localStorage.setItem('fp_ultimo_sync',agora);
@@ -2047,7 +2298,7 @@ async function sincronizarAgora(){
 async function enviarParaSheets(){
   if($('syncLog')){ $('syncLog').innerHTML=''; $('syncLog').style.display='none'; }
   addSyncLog('Preparando envio para o Google Sheets...','info');
-  if(!await garantirToken()){ addSyncLog('Sem token OAuth. Faça logout e login novamente.','error'); return; }
+  if(!await garantirToken(true)){ addSyncLog('Sem token OAuth. Clique novamente para tentar.','error'); return; }
   if(!state.sheetsId){
     addSyncLog('Criando planilha pessoal...','info');
     var novoId=await criarPlanilhaCliente();
@@ -2066,7 +2317,7 @@ async function enviarParaSheets(){
 async function buscarPlanilhaNosDrive(){
   if($('syncLog')){ $('syncLog').innerHTML=''; $('syncLog').style.display='none'; }
   addSyncLog('Buscando planilha FinançasPro no Google Drive...','info');
-  if(!await garantirToken()){ addSyncLog('Sem token OAuth.','error'); return; }
+  if(!await garantirToken(true)){ addSyncLog('Sem token OAuth. Clique novamente para tentar.','error'); return; }
   try{
     var q=encodeURIComponent("name contains 'FinançasPro' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false");
     var res=await fetch(DRIVE_API+'?q='+q+'&fields=files(id,name,modifiedTime)&orderBy=modifiedTime%20desc',{headers:{'Authorization':'Bearer '+state.accessToken}});
@@ -2149,3 +2400,33 @@ function limparDados(){
   state.lancamentos=[]; state.cartoes=[]; saveLocal(); destroyAllCharts(); renderAll(); updateConfigPanel();
   alert('✅ Dados locais apagados.\nUse "Sincronizar ↓" para recarregar do Sheets.');
 }
+
+// ══════════════════════════════════════════════════
+// AUTO-LOGIN — entra automático se já tiver sessão salva
+// ══════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', function() {
+  try {
+    const savedUser = localStorage.getItem('fp_user');
+    if (!savedUser) return; // 1ª visita — deixa tela de login normal
+    const user = JSON.parse(savedUser);
+    if (!user || !user.email) return;
+    // Usuário já cadastrado — entra automaticamente
+    state.user     = user;
+    state.sheetsId = localStorage.getItem('fp_sheets_id_' + user.email) || null;
+    // Aguarda Google SDK carregar para inicializar token (silencioso)
+    function tryInit() {
+      if (window.google && google.accounts && google.accounts.oauth2) {
+        _inicializarTokenClient();
+      }
+      initApp();
+    }
+    // Pequeno delay para garantir que o SDK carregou
+    if (window.google && google.accounts) {
+      tryInit();
+    } else {
+      setTimeout(tryInit, 1500);
+    }
+  } catch(e) {
+    console.warn('Auto-login falhou, usando tela de login normal:', e);
+  }
+});
