@@ -604,9 +604,11 @@ async function loadFromSheets() {
         recorrente: String(r[8]||'').toUpperCase() === 'TRUE',
         cartaoId:   String(r[9]||''),
       }));
-    } else {
-      state.lancamentos = []; // planilha vazia — limpa dados locais
+    } else if (rowsL.length === 1) {
+      // Só o cabeçalho — planilha confirmada vazia
+      state.lancamentos = [];
     }
+    // Se rowsL.length === 0: possível erro de API/token — mantém dados locais
     // Lê cartões
     const rowsC = await fpSheetsLer('💳 Cartões');
     if (rowsC.length > 1) {
@@ -619,9 +621,11 @@ async function loadFromSheets() {
         cor:        String(r[5]||'#2D6A4F'),
         corCustom:  String(r[6]||'').toUpperCase() === 'TRUE',
       }));
-    } else {
-      state.cartoes = []; // planilha vazia — limpa cartões locais
+    } else if (rowsC.length === 1) {
+      // Só o cabeçalho — planilha confirmada vazia
+      state.cartoes = [];
     }
+    // Se rowsC.length === 0: possível erro de API/token — mantém dados locais
     saveLocal();
     renderAll();
     localStorage.setItem('fp_ultimo_sync', new Date().toISOString());
@@ -1973,7 +1977,13 @@ function showFinnTransition(){
   if(!ft) return;
   if(ftm) ftm.textContent=FINN_MSGS[Math.floor(Math.random()*FINN_MSGS.length)];
   ft.style.display='flex';
-  setTimeout(function(){ ft.style.display='none'; }, 1800);
+  // Força repaint antes de adicionar a classe de transição
+  ft.offsetHeight;
+  ft.classList.add('finn-transition-in');
+  setTimeout(function(){
+    ft.classList.remove('finn-transition-in');
+    setTimeout(function(){ ft.style.display='none'; }, 400);
+  }, 1800);
 }
 
 // LOG SYNC
