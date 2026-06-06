@@ -327,6 +327,11 @@ async function checkAccess(email, payload) {
     if (data.authorized) {
       state.user     = { email, name: payload.name, picture: payload.picture };
       state.sheetsId = data.sheetsId || null; // sheetsId salvo de login anterior
+      // Servidor é a fonte de verdade — salva no localStorage para que
+      // auto-login (refresh de página) sempre use o ID correto do servidor
+      if (data.sheetsId) {
+        localStorage.setItem('fp_sheets_id_' + email, data.sheetsId);
+      }
       // Inicializa o cliente OAuth para Sheets API
       _inicializarTokenClient();
       initApp();
@@ -686,9 +691,24 @@ async function setupSheetsCliente() {
 }
 
 // ──────────────────────────────────────────────────
+// Valida se um sheetsId realmente existe e é acessível.
+// Retorna true se ok, false se inválido/inexistente.
+// ──────────────────────────────────────────────────
+async function _validarSheetsId(id) {
+  if (!id || !state.accessToken || Date.now() >= state.tokenExpiry) return false;
+  try {
+    const res = await fetch(
+      `${SHEETS_API}/${id}?fields=spreadsheetId`,
+      { headers: { 'Authorization': `Bearer ${state.accessToken}` } }
+    );
+    return res.ok;
+  } catch(e) { return false; }
+}
+
+// ──────────────────────────────────────────────────
 // Busca silenciosa de planilha FinançasPro no Drive
 // Não exibe popup, não gera log de erro visível.
-// Retorna o ID da planilha mais recente ou null.
+// Retorna o ID da planilha mais ANTIGA (original) ou null.
 // ──────────────────────────────────────────────────
 async function _buscarPlanilhaSilenciosa() {
   // Precisa de token mas sem forçar popup (false = silencioso)
@@ -697,14 +717,15 @@ async function _buscarPlanilhaSilenciosa() {
     const q = encodeURIComponent(
       "name contains 'FinançasPro' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false"
     );
+    // orderBy=createdTime asc → retorna a MAIS ANTIGA primeiro (a planilha original)
     const res = await fetch(
-      `${DRIVE_API}?q=${q}&fields=files(id,name,modifiedTime)&orderBy=modifiedTime%20desc`,
+      `${DRIVE_API}?q=${q}&fields=files(id,name,createdTime)&orderBy=createdTime%20asc`,
       { headers: { 'Authorization': `Bearer ${state.accessToken}` } }
     );
     const data = await res.json();
     if (data.files && data.files.length > 0) {
-      console.log('[Drive] Planilha existente encontrada:', data.files[0].name, data.files[0].id);
-      return data.files[0].id; // a mais recente
+      console.log('[Drive] Planilha encontrada:', data.files[0].name, data.files[0].id);
+      return data.files[0].id; // a mais antiga = a original
     }
     return null;
   } catch(e) {
@@ -2486,8 +2507,13 @@ async function enviarParaSheets(){
   if($('syncLog')){ $('syncLog').innerHTML=''; $('syncLog').style.display='none'; }
   addSyncLog('Preparando envio para o Google Sheets...','info');
   if(!await garantirToken(true)){ addSyncLog('Sem token OAuth. Clique novamente para tentar.','error'); return; }
+  // Valida o sheetsId atual — se inválido (ID errado de outro dispositivo), auto-corrige
+  if(state.sheetsId && !await _validarSheetsId(state.sheetsId)){
+    addSyncLog('ID da planilha inválido, buscando planilha correta no Drive...','warn');
+    state.sheetsId = null;
+    localStorage.removeItem('fp_sheets_id_'+state.user.email);
+  }
   if(!state.sheetsId){
-    // NUNCA criar direto — sempre buscar no Drive antes para evitar duplicatas
     addSyncLog('Verificando planilha existente no Drive...','info');
     await setupSheetsCliente();
     if(!state.sheetsId){ addSyncLog('Não foi possível localizar ou criar a planilha. Tente novamente.','error'); return; }
