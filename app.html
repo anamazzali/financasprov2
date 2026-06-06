@@ -132,6 +132,7 @@
         <div class="kpi-card kpi-despesa"><div class="kpi-label">Despesas</div><div class="kpi-val" id="totalDespesa">R$ 0,00</div><div class="kpi-sub">este mês</div></div>
         <div class="kpi-card kpi-saldo"><div class="kpi-label">Saldo</div><div class="kpi-val" id="totalSaldo">R$ 0,00</div><div class="kpi-sub">receita − despesas</div></div>
         <div class="kpi-card kpi-economia"><div class="kpi-label">Taxa de Economia</div><div class="kpi-val" id="taxaEconomia">0%</div><div class="kpi-sub">meta: 20%</div></div>
+        <div class="kpi-card kpi-saldo"><div class="kpi-label">🍱 Saldo Ticket Alimentação</div><div class="kpi-val" id="kpiSaldoTicket">R$ 0,00</div><div class="kpi-sub" id="kpiSaldoTicketSub">acumulado (carry-over)</div></div>
       </div>
       <div class="insights-grid">
         <div class="insight-card"><div class="insight-label">🔴 Maior Gasto do Mês</div><div class="insight-val" id="maiorGasto">—</div></div>
@@ -421,7 +422,11 @@
       <div class="form-row" style="align-items:flex-start;">
         <label style="padding-top:10px;">Categoria</label>
         <div style="display:flex;flex-direction:column;gap:6px;flex:1;">
-          <select id="fCategoria"></select>
+          <select id="fCategoria" onchange="_aplicarTravaValeAlim()"></select>
+          <!-- Aviso de categoria protegida — exibido automaticamente para Vale Alimentação -->
+          <div id="avisoValeAlim" style="display:none;align-items:center;gap:7px;background:#e8f5e9;border:1px solid #a5d6a7;border-radius:8px;padding:7px 10px;font-size:0.75rem;color:#2e7d32;">
+            🔒 <span>Categoria protegida — <strong>Ticket Alimentação</strong> é destinado exclusivamente à categoria Alimentação e o saldo positivo acumula para o próximo mês.</span>
+          </div>
           <button type="button" onclick="openCatModal()" style="background:none;border:1px dashed var(--bege-escuro);border-radius:8px;padding:5px 10px;font-size:0.75rem;color:var(--texto-medio);cursor:pointer;text-align:left;">⚙️ Gerenciar categorias</button>
         </div>
       </div>
