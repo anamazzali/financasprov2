@@ -869,6 +869,31 @@ function getLancamentosAno(y=state.currentYear) {
 }
 
 // ══════════════════════════════════════════════════
+// SALDO ACUMULADO — TICKET ALIMENTAÇÃO
+// O saldo acumula desde o primeiro lançamento:
+//   +valor de cada receita "Vale Alimentação"
+//   -valor de cada despesa  "Alimentação"
+// até o mês/ano informados (inclusive).
+// Saldo positivo = sobra carregada para o próximo mês.
+// ══════════════════════════════════════════════════
+function getSaldoValeAlim(mesAtual, anoAtual) {
+  let saldo = 0;
+  state.lancamentos.forEach(l => {
+    const d = new Date(l.data + 'T12:00:00');
+    const m = d.getMonth(), y = d.getFullYear();
+    // Ignora lançamentos posteriores ao mês atual
+    if (y > anoAtual || (y === anoAtual && m > mesAtual)) return;
+    if (l.tipo === 'receita' && l.categoria === 'Vale Alimentação') {
+      saldo += parseFloat(l.valor || 0);
+    }
+    if (l.tipo === 'despesa' && l.categoria === 'Alimentação') {
+      saldo -= parseFloat(l.valor || 0);
+    }
+  });
+  return saldo;
+}
+
+// ══════════════════════════════════════════════════
 // RENDER ALL
 // ══════════════════════════════════════════════════
 function renderAll() {
@@ -939,6 +964,19 @@ function renderDashboard() {
   $('totalDespesa').textContent = fmt(despesa);
   $('totalSaldo').textContent   = fmt(saldo);
   $('taxaEconomia').textContent = `${taxa}%`;
+
+  // KPI — Saldo acumulado do Ticket Alimentação
+  const saldoVA = getSaldoValeAlim(state.currentMonth, state.currentYear);
+  const elKpiVA = $('kpiSaldoTicket');
+  if (elKpiVA) {
+    elKpiVA.textContent = fmt(saldoVA);
+    const card = elKpiVA.closest('.kpi-card');
+    if (card) {
+      card.className = 'kpi-card ' + (saldoVA >= 0 ? 'kpi-saldo' : 'kpi-despesa');
+    }
+    const sub = $('kpiSaldoTicketSub');
+    if (sub) sub.textContent = saldoVA >= 0 ? '✅ Disponível p/ Alimentação' : '⚠️ Déficit Alimentação';
+  }
 
   const despesas = items.filter(l=>l.tipo==='despesa');
   const maiorItem = [...despesas].sort((a,b)=>b.valor-a.valor)[0];
@@ -1299,6 +1337,8 @@ function openModal(edit=null) {
   toggleCartaoRow();
   updateTipoColor();
   if (isParcelado) calcularParcelamento();
+  // Aplica trava do Vale Alimentação ao abrir modal com item existente
+  _aplicarTravaValeAlim();
   $('modal').style.display = 'flex';
 }
 function closeModal(){$('modal').style.display='none';}
@@ -1416,6 +1456,20 @@ function updateCategorias() {
   if ($('modal') && $('modal').style.display !== 'none') {
     toggleCartaoRow();
   }
+  // Aplica trava do Ticket Alimentação após popular o select
+  _aplicarTravaValeAlim();
+}
+
+// Trava automática: quando tipo=receita + categoria=Vale Alimentação,
+// o select de categoria fica desabilitado para evitar realocação indevida.
+function _aplicarTravaValeAlim() {
+  const fTipo = $('fTipo');
+  const fCat  = $('fCategoria');
+  const aviso = $('avisoValeAlim');
+  if (!fTipo || !fCat) return;
+  const isVA = fTipo.value === 'receita' && fCat.value === 'Vale Alimentação';
+  fCat.disabled = isVA;
+  if (aviso) aviso.style.display = isVA ? 'flex' : 'none';
 }
 function saveLancamento() {
   const tipo=$('fTipo').value, desc=$('fDesc').value.trim();
