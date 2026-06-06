@@ -18,6 +18,7 @@ const DRIVE_API  = 'https://www.googleapis.com/drive/v3/files';
 const OAUTH_SCOPES = [
   'https://www.googleapis.com/auth/spreadsheets',
   'https://www.googleapis.com/auth/drive.file',
+  'https://www.googleapis.com/auth/drive.metadata.readonly', // permite buscar planilhas em qualquer dispositivo
 ].join(' ');
 
 
@@ -2486,12 +2487,10 @@ async function enviarParaSheets(){
   addSyncLog('Preparando envio para o Google Sheets...','info');
   if(!await garantirToken(true)){ addSyncLog('Sem token OAuth. Clique novamente para tentar.','error'); return; }
   if(!state.sheetsId){
-    addSyncLog('Criando planilha pessoal...','info');
-    var novoId=await criarPlanilhaCliente();
-    if(!novoId){ return; }
-    state.sheetsId=novoId;
-    localStorage.setItem('fp_sheets_id_'+state.user.email,novoId);
-    sheetsPOST({action:'saveSheetsId',email:state.user.email,sheetsId:novoId});
+    // NUNCA criar direto — sempre buscar no Drive antes para evitar duplicatas
+    addSyncLog('Verificando planilha existente no Drive...','info');
+    await setupSheetsCliente();
+    if(!state.sheetsId){ addSyncLog('Não foi possível localizar ou criar a planilha. Tente novamente.','error'); return; }
   }
   addSyncLog('Enviando '+state.lancamentos.length+' lançamentos e '+state.cartoes.length+' cartões...','info');
   var ok=await _syncParaSheetsCliente();
