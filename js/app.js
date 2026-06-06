@@ -1951,13 +1951,21 @@ function renderDRE() {
 // ══════════════════════════════════════════════════
 function renderCaixinhas() {
   CAIXINHAS = getCaixinhas(); // sempre recarrega do localStorage
-  const receita=sumBy(getLancamentosMes(),'receita');
-  const despesas=getLancamentosMes().filter(l=>l.tipo==='despesa');
+  const lancMes = getLancamentosMes();
+  const receita=sumBy(lancMes,'receita');
+  const despesas=lancMes.filter(l=>l.tipo==='despesa');
   const byCat=getCatTotals(despesas);
 
   const el=$('caixinhasContent');
   const totalDespesa=Object.values(byCat).reduce((s,v)=>s+v,0);
   const base = receita; // usa a receita real do mês automaticamente
+
+  // Tickets especiais: Vale Alimentação e Vale Transporte são alocados
+  // 100% em Necessidades, independente do % configurado na caixinha.
+  const receitaVale = lancMes
+    .filter(l => l.tipo==='receita' && (l.categoria==='Vale Alimentação' || l.categoria==='Vale Transporte'))
+    .reduce((s,l) => s + parseFloat(l.valor||0), 0);
+  const receitaNormal = receita - receitaVale;
 
   // FEATURE 6 — Resumo acima dos valores
   const resumoAcima = `
@@ -1980,7 +1988,10 @@ function renderCaixinhas() {
   el.innerHTML = resumoAcima + `
     <div class="caixinhas-grid">
       ${CAIXINHAS.map(cx=>{
-        const alocado=(base||0)*(cx.pct/100);
+        // Tickets VA/VT alocam 100% em Necessidades; demais receitas seguem % normal
+        const alocado = cx.key==='necessidades'
+          ? receitaVale + (receitaNormal||0)*(cx.pct/100)
+          : (receitaNormal||0)*(cx.pct/100);
         const gasto=cx.cats.reduce((s,c)=>s+(byCat[c]||0),0);
         const diff=alocado-gasto;
         const pct=alocado>0?Math.min(100,Math.round(gasto/alocado*100)):0;
