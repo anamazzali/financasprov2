@@ -2570,10 +2570,10 @@ function exportarDados(){
 
 // LIMPAR DADOS LOCAIS
 function limparDados(){
-  if(!confirm('⚠️ Apagará TODOS os dados locais.\nOs dados no Sheets permanecem.\n\nContinuar?')) return;
-  if(!confirm('Confirmar exclusão dos dados locais?')) return;
+  if(!confirm('\u26a0\ufe0f Apagar\u00e1 TODOS os dados locais.\nOs dados no Sheets permanecem.\n\nContinuar?')) return;
+  if(!confirm('Confirmar exclus\u00e3o dos dados locais?')) return;
   state.lancamentos=[]; state.cartoes=[]; saveLocal(); destroyAllCharts(); renderAll(); updateConfigPanel();
-  alert('✅ Dados locais apagados.\nUse "Sincronizar ↓" para recarregar do Sheets.');
+  alert('\u2705 Dados locais apagados.\nUse "Sincronizar \u2193" para recarregar do Sheets.');
 }
 
 // ══════════════════════════════════════════════════
