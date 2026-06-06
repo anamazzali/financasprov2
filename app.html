@@ -82,6 +82,7 @@
       <button class="nav-item active" data-tab="dashboard"       onclick="switchTab('dashboard')">      <span class="nav-icon">📊</span> Dashboard</button>
       <button class="nav-item"        data-tab="lancamentos"     onclick="switchTab('lancamentos')">    <span class="nav-icon">📝</span> Lançamentos</button>
       <button class="nav-item"        data-tab="cartoes"         onclick="switchTab('cartoes')">        <span class="nav-icon">💳</span> Cartões</button>
+      <button class="nav-item"        data-tab="contas"          onclick="switchTab('contas')">         <span class="nav-icon">🏛️</span> Contas Bancárias</button>
 
       <div class="nav-group-label">Análises</div>
       <button class="nav-item"        data-tab="relatorios"      onclick="switchTab('relatorios')">     <span class="nav-icon">📈</span> Relatório Mensal</button>
@@ -130,7 +131,7 @@
       <div class="cards-grid">
         <div class="kpi-card kpi-receita"><div class="kpi-label">Receita Total</div><div class="kpi-val" id="totalReceita">R$ 0,00</div><div class="kpi-sub">este mês</div></div>
         <div class="kpi-card kpi-despesa"><div class="kpi-label">Despesas</div><div class="kpi-val" id="totalDespesa">R$ 0,00</div><div class="kpi-sub">este mês</div></div>
-        <div class="kpi-card kpi-saldo"><div class="kpi-label">Saldo</div><div class="kpi-val" id="totalSaldo">R$ 0,00</div><div class="kpi-sub">receita − despesas</div></div>
+        <div class="kpi-card kpi-saldo"><div class="kpi-label">💰 Saldo Acumulado</div><div class="kpi-val" id="totalSaldo">R$ 0,00</div><div class="kpi-sub" id="totalSaldoSub">inclui sobra dos meses anteriores</div></div>
         <div class="kpi-card kpi-economia"><div class="kpi-label">Taxa de Economia</div><div class="kpi-val" id="taxaEconomia">0%</div><div class="kpi-sub">meta: 20%</div></div>
         <div class="kpi-card kpi-saldo"><div class="kpi-label">🍱 Saldo Ticket Alimentação</div><div class="kpi-val" id="kpiSaldoTicket">R$ 0,00</div><div class="kpi-sub" id="kpiSaldoTicketSub">acumulado (carry-over)</div></div>
         <div class="kpi-card kpi-saldo"><div class="kpi-label">🚌 Saldo Ticket Transporte</div><div class="kpi-val" id="kpiSaldoTransporte">R$ 0,00</div><div class="kpi-sub" id="kpiSaldoTransporteSub">acumulado (carry-over)</div></div>
@@ -186,6 +187,16 @@
         </div>
       </div>
       <div id="cartoesList" class="cartoes-grid"></div>
+    </div>
+
+    <!-- CONTAS BANCÁRIAS -->
+    <div id="tab-contas" class="tab-content" style="display:none;">
+      <div class="tab-header">
+        <h2 class="tab-title">Contas Bancárias</h2>
+        <button class="btn-add" onclick="openContaModal()">+ Nova Conta</button>
+      </div>
+      <div id="contasSummary"></div>
+      <div id="contasList" class="cartoes-grid"></div>
     </div>
 
     <!-- RELATÓRIO -->
@@ -451,6 +462,11 @@
         </select>
       </div>
       <div class="form-row" id="cartaoRow" style="display:none;"><label>Cartão</label><select id="fCartao"></select></div>
+      <div class="form-row" id="contaRow"><label>Conta</label>
+        <select id="fConta">
+          <option value="">— Selecione a conta —</option>
+        </select>
+      </div>
 
       <!-- PARCELAMENTO -->
       <div id="parcelamentoRow" style="display:none;">
@@ -491,6 +507,41 @@
       <div class="form-row form-row-check"><label class="check-label"><input type="checkbox" id="fRecorrente" /><span>Lançamento recorrente (repete todo mês)</span></label></div>
     </div>
     <div class="modal-footer"><button class="btn-cancel" onclick="closeModal()">Cancelar</button><button class="btn-save" onclick="saveLancamento()">Salvar</button></div>
+  </div>
+</div>
+
+<!-- MODAL CONTA BANCÁRIA -->
+<div id="contaModal" class="modal-overlay" style="display:none;">
+  <div class="modal">
+    <div class="modal-header"><h3>Nova Conta Bancária</h3><button onclick="closeContaModal()" class="modal-close">✕</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label>Banco / Instituição</label>
+        <div class="banco-grid" id="contaBancoGrid"></div>
+      </div>
+      <div class="form-row">
+        <label>Tipo de conta</label>
+        <select id="ctTipo" onchange="onCtTipoChange()">
+          <option value="corrente">🏦 Conta Corrente</option>
+          <option value="poupanca">🐷 Poupança</option>
+          <option value="investimento">📈 Investimento</option>
+        </select>
+      </div>
+      <div class="form-row"><label>Nome / Apelido</label><input type="text" id="ctNome" placeholder="Ex: BB Corrente, Nu Invest, BB Poupança 1..." oninput="atualizarPreviewConta()" /></div>
+      <div class="form-row"><label>Saldo inicial (R$)</label><input type="number" id="ctSaldo" step="0.01" placeholder="0,00" oninput="atualizarPreviewConta()" /></div>
+      <div class="form-row">
+        <label>Preview</label>
+        <div id="contaPreview" class="card-preview">
+          <div id="contaPreviewName">Selecione o banco acima</div>
+          <div id="contaPreviewSaldo">Saldo inicial: R$ 0,00</div>
+        </div>
+      </div>
+      <div class="form-row form-row-check">
+        <label class="check-label"><input type="checkbox" id="ctCorCustom" onchange="toggleCorCustomConta()" /><span>Usar cor personalizada</span></label>
+      </div>
+      <div class="form-row" id="ctCorRow" style="display:none;"><label>Cor personalizada</label><input type="color" id="ctCor" value="#2D6A4F" oninput="atualizarPreviewConta()" /></div>
+    </div>
+    <div class="modal-footer"><button class="btn-cancel" onclick="closeContaModal()">Cancelar</button><button class="btn-save" onclick="saveConta()">Salvar</button></div>
   </div>
 </div>
 
