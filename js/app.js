@@ -1,4 +1,4 @@
-/* FinançasProV2 — app.js v3.0 */
+/* FinançasProV2 — app.js v4.0 */
 'use strict';
 
 // ══════════════════════════════════════════════════
@@ -407,14 +407,22 @@ function initApp() {
   setTimeout(async () => {
     if (!state.tokenClient) _inicializarTokenClient();
     const ok = await garantirToken(true);
-    if (ok && state.sheetsId) {
-      // Se já tem planilha configurada e tem dados locais, sobe automaticamente
-      if (state.lancamentos.length > 0 || state.cartoes.length > 0) {
-        await _syncParaSheetsCliente();
+    if (ok) {
+      // Valida o sheetsId ANTES de usar — pode ser inválido vindo do Apps Script
+      // (ex: planilha deletada ou ID antigo registrado no servidor)
+      if (state.sheetsId && !await _validarSheetsId(state.sheetsId)) {
+        state.sheetsId = null;
+        localStorage.removeItem('fp_sheets_id_' + state.user.email);
       }
-    } else if (ok && !state.sheetsId) {
-      // Cria planilha se não existir ainda
-      await setupSheetsCliente();
+      if (state.sheetsId) {
+        // Planilha válida — sobe dados locais automaticamente
+        if (state.lancamentos.length > 0 || state.cartoes.length > 0) {
+          await _syncParaSheetsCliente();
+        }
+      } else {
+        // Sem planilha válida — busca no Drive ou cria nova
+        await setupSheetsCliente();
+      }
     }
   }, 3000);
   // Primeira visita — abre Comece Aqui automaticamente
