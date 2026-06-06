@@ -6,7 +6,7 @@
 // ══════════════════════════════════════════════════
 const CONFIG = {
   // URL do Apps Script — autorização + webhook Hotmart (não muda)
-  SHEETS_URL: 'https://script.google.com/macros/s/AKfycbx4v-zbJtaraPD578ScMOYnLTupDW7XAdXoBxPacDnPbk0FrCc4KuXy9sGLIHLu7hdXNQ/exec',
+  SHEETS_URL: 'https://script.google.com/macros/s/AKfycbzWz1sJn9WFIc5hgFgOAEek-X6PWq0XLKEdPahzIDHpl8BA1SV2EYS8dU1qP7lxU0Lh/exec',
   // Google Client ID — mesmo do Google Sign-In (cole o seu)
   GOOGLE_CLIENT_ID: '415111664058-jgshiqlt2qbidcd5frdrg59omjelkg2u.apps.googleusercontent.com',
 };
