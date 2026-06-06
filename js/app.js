@@ -643,23 +643,30 @@ async function criarPlanilhaCliente() {
 async function setupSheetsCliente() {
   if (!state.user) return;
 
-  // 1. Fonte de verdade primária: sheetsId que veio do servidor via checkAccess
-  // 2. Fallback: localStorage do dispositivo atual (pode estar vazio em novo dispositivo)
+  // Coluna N (servidor) sempre prevalece sobre cache local errado do celular
+  await refreshSheetsIdFromServer(state.user.email);
+
   const localId = localStorage.getItem('fp_sheets_id_' + state.user.email);
   if (!state.sheetsId && localId) state.sheetsId = localId;
 
-  // 3. Se ainda não encontrou ID, busca SILENCIOSAMENTE no Drive
-  //    — isso resolve o cenário de novo dispositivo (celular, outro PC)
-  //      onde o localStorage está vazio mas a planilha já existe no Drive
+  // Rejeita planilha admin Clientes se estiver no cache
+  if (state.sheetsId && state.accessToken && Date.now() < state.tokenExpiry) {
+    if (!await _validarSheetsId(state.sheetsId)) {
+      addSyncLog('Planilha incorreta detectada (admin). Corrigindo...', 'warn');
+      state.sheetsId = null;
+      localStorage.removeItem('fp_sheets_id_' + state.user.email);
+      await refreshSheetsIdFromServer(state.user.email);
+    }
+  }
+
   if (!state.sheetsId) {
     addSyncLog('Verificando planilha existente no Drive...', 'info');
     const idExistente = await _buscarPlanilhaSilenciosa();
     if (idExistente) {
       state.sheetsId = idExistente;
       localStorage.setItem('fp_sheets_id_' + state.user.email, idExistente);
-      // Atualiza o servidor com o ID encontrado (sincroniza para todos os dispositivos)
       await sheetsPOST({ action: 'saveSheetsId', email: state.user.email, sheetsId: idExistente });
-      addSyncLog('✅ Planilha existente localizada e vinculada automaticamente.', 'ok');
+      addSyncLog('✅ Planilha pessoal localizada e vinculada.', 'ok');
     }
   }
 
@@ -687,17 +694,50 @@ async function setupSheetsCliente() {
 }
 
 // ──────────────────────────────────────────────────
-// Valida se um sheetsId realmente existe e é acessível.
-// Retorna true se ok, false se inválido/inexistente.
+// Planilha pessoal vs planilha admin (Clientes) — nunca misturar
 // ──────────────────────────────────────────────────
+function _nomePlanilhaValido(nome) {
+  const n = (nome || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (n.indexOf('clientes') !== -1) return false;
+  return n.indexOf('financaspro') !== -1;
+}
+
+async function _obterTituloPlanilha(id) {
+  if (!id || !state.accessToken || Date.now() >= state.tokenExpiry) return '';
+  try {
+    const res = await fetch(
+      `${SHEETS_API}/${id}?fields=properties.title`,
+      { headers: { 'Authorization': `Bearer ${state.accessToken}` } }
+    );
+    if (!res.ok) return '';
+    const data = await res.json();
+    return (data.properties && data.properties.title) || '';
+  } catch(e) { return ''; }
+}
+
+async function refreshSheetsIdFromServer(email) {
+  try {
+    const data = await sheetsGET('action=checkAccess&email=' + encodeURIComponent(email));
+    if (data && data.authorized && data.sheetsId) {
+      state.sheetsId = data.sheetsId;
+      localStorage.setItem('fp_sheets_id_' + email, data.sheetsId);
+      return data.sheetsId;
+    }
+  } catch(e) { console.warn('refreshSheetsIdFromServer:', e); }
+  return null;
+}
+
+// Valida se um sheetsId realmente existe e é planilha PESSOAL (não admin Clientes)
 async function _validarSheetsId(id) {
   if (!id || !state.accessToken || Date.now() >= state.tokenExpiry) return false;
   try {
     const res = await fetch(
-      `${SHEETS_API}/${id}?fields=spreadsheetId`,
+      `${SHEETS_API}/${id}?fields=spreadsheetId,properties.title`,
       { headers: { 'Authorization': `Bearer ${state.accessToken}` } }
     );
-    return res.ok;
+    if (!res.ok) return false;
+    const data = await res.json();
+    return _nomePlanilhaValido(data.properties && data.properties.title);
   } catch(e) { return false; }
 }
 
@@ -707,21 +747,29 @@ async function _validarSheetsId(id) {
 // Retorna o ID da planilha mais ANTIGA (original) ou null.
 // ──────────────────────────────────────────────────
 async function _buscarPlanilhaSilenciosa() {
-  // Precisa de token mas sem forçar popup (false = silencioso)
   if (!await garantirToken(false)) return null;
   try {
     const q = encodeURIComponent(
-      "name contains 'FinançasPro' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false"
+      "name contains 'FinançasPro' and not name contains 'Clientes' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false"
     );
-    // orderBy=createdTime asc → retorna a MAIS ANTIGA primeiro (a planilha original)
     const res = await fetch(
       `${DRIVE_API}?q=${q}&fields=files(id,name,createdTime)&orderBy=createdTime%20asc`,
       { headers: { 'Authorization': `Bearer ${state.accessToken}` } }
     );
     const data = await res.json();
-    if (data.files && data.files.length > 0) {
-      console.log('[Drive] Planilha encontrada:', data.files[0].name, data.files[0].id);
-      return data.files[0].id; // a mais antiga = a original
+    const files = (data.files || []).filter(f => _nomePlanilhaValido(f.name));
+    if (files.length > 0) {
+      // Prefere planilha com nome do usuário (ex: "FinançasPro — Ana Cris")
+      const primeiroNome = ((state.user && state.user.name) || '').split(' ')[0].toLowerCase();
+      if (primeiroNome) {
+        const comNome = files.find(f => f.name.toLowerCase().indexOf(primeiroNome) !== -1);
+        if (comNome) {
+          console.log('[Drive] Planilha pessoal:', comNome.name, comNome.id);
+          return comNome.id;
+        }
+      }
+      console.log('[Drive] Planilha pessoal:', files[0].name, files[0].id);
+      return files[0].id;
     }
     return null;
   } catch(e) {
@@ -2475,8 +2523,17 @@ async function testarConexao(){
   var st=$('configSyncStatus');
   if(st){ st.textContent='⏳ Testando...'; st.style.color='#555'; }
   addSyncLog('Iniciando teste de conexão...','info');
-  try{ await fetch(CONFIG.SHEETS_URL+'?action=ping'); addSyncLog('Apps Script: OK ✅','ok'); }
-  catch(e){ addSyncLog('Apps Script inacessível.','warn'); }
+  try {
+    var emailTeste = state.user && state.user.email ? state.user.email : '';
+    if (emailTeste) {
+      var data = await sheetsGET('action=checkAccess&email=' + encodeURIComponent(emailTeste));
+      if (data && data.authorized) addSyncLog('Apps Script: OK ✅','ok');
+      else if (data && data.reason) addSyncLog('Apps Script: ' + data.reason,'warn');
+      else addSyncLog('Apps Script inacessível.','warn');
+    } else {
+      addSyncLog('Apps Script: faça login para testar.','warn');
+    }
+  } catch(e) { addSyncLog('Apps Script inacessível.','warn'); }
   var temToken=await garantirToken(false);
   if(!temToken){ addSyncLog('Token OAuth não encontrado. Use "Enviar ↑" primeiro para autorizar.','warn'); if(st){st.textContent='⚠️ Use Enviar ↑ primeiro';st.style.color='#A07820';} return; }
   addSyncLog('Token OAuth: válido ✅','ok');
@@ -2526,37 +2583,48 @@ async function buscarPlanilhaNosDrive(){
   addSyncLog('Buscando planilha FinançasPro no Google Drive...','info');
   if(!await garantirToken(true)){ addSyncLog('Sem token OAuth. Clique novamente para tentar.','error'); return; }
   try{
-    var q=encodeURIComponent("name contains 'FinançasPro' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false");
+    var q=encodeURIComponent("name contains 'FinançasPro' and not name contains 'Clientes' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false");
     var res=await fetch(DRIVE_API+'?q='+q+'&fields=files(id,name,modifiedTime)&orderBy=modifiedTime%20desc',{headers:{'Authorization':'Bearer '+state.accessToken}});
     var data=await res.json();
     if(data.error){ addSyncLog('Erro Drive API: '+data.error.message,'error'); return; }
-    if(data.files&&data.files.length>0){
-      addSyncLog('Encontrada(s) '+data.files.length+' planilha(s):','ok');
+    var files=(data.files||[]).filter(function(p){ return _nomePlanilhaValido(p.name); });
+    if(files.length>0){
+      addSyncLog('Encontrada(s) '+files.length+' planilha(s) pessoal(is):','ok');
       var log=$('syncLog');
-      data.files.forEach(function(p){
+      files.forEach(function(p){
         var dt=p.modifiedTime?new Date(p.modifiedTime).toLocaleDateString('pt-BR'):'';
         var div=document.createElement('div');
         div.style.cssText='display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:rgba(27,122,62,0.07);border-radius:6px;margin:3px 0;font-size:0.78rem;gap:8px;';
         div.innerHTML='<span>📊 <strong>'+p.name+'</strong> <span style="color:#999;">'+dt+'</span></span><button onclick="vincularPlanilha(\''+p.id+'\')" style="background:#1B7A3E;color:#fff;border:none;border-radius:6px;padding:3px 10px;cursor:pointer;font-size:0.75rem;">Vincular ✅</button>';
         if(log) log.appendChild(div);
       });
-      vincularPlanilha(data.files[0].id,false);
-      addSyncLog('✅ Planilha mais recente vinculada. Clique em "Sincronizar ↓".','ok');
+      vincularPlanilha(files[0].id,false);
+      addSyncLog('✅ Planilha pessoal vinculada. Clique em "Sincronizar ↓".','ok');
     } else {
       addSyncLog('Nenhuma planilha FinançasPro encontrada. Cole o ID manualmente abaixo.','warn');
     }
   } catch(e){ addSyncLog('Erro: '+(e.message||e),'error'); }
 }
 
-function vincularPlanilha(id,log){
-  if(log===undefined) log=true;
-  if(!id) return;
-  state.sheetsId=id;
-  localStorage.setItem('fp_sheets_id_'+state.user.email,id);
-  sheetsPOST({action:'saveSheetsId',email:state.user.email,sheetsId:id});
-  if($('inputSheetsId')) $('inputSheetsId').value=id;
+async function vincularPlanilha(id, log) {
+  if (log === undefined) log = true;
+  if (!id) return;
+  if (state.accessToken && Date.now() < state.tokenExpiry) {
+    const titulo = await _obterTituloPlanilha(id);
+    if (titulo && !_nomePlanilhaValido(titulo)) {
+      if (log) addSyncLog('❌ Esta é a planilha de Clientes (admin). Use "FinançasPro — Ana Cris".', 'error');
+      return;
+    }
+  }
+  state.sheetsId = id;
+  localStorage.setItem('fp_sheets_id_' + state.user.email, id);
+  sheetsPOST({ action: 'saveSheetsId', email: state.user.email, sheetsId: id });
+  if ($('inputSheetsId')) $('inputSheetsId').value = id;
   updateConfigPanel();
-  if(log){ addSyncLog('✅ Planilha vinculada: '+id.substring(0,24)+'...','ok'); addSyncLog('Clique em "Sincronizar ↓" para carregar os dados.','info'); }
+  if (log) {
+    addSyncLog('✅ Planilha vinculada: ' + id.substring(0, 24) + '...', 'ok');
+    addSyncLog('Clique em "Sincronizar ↓" para carregar os dados.', 'info');
+  }
 }
 
 function vincularPlanilhaManual(){
@@ -2611,30 +2679,28 @@ function limparDados(){
 // ══════════════════════════════════════════════════
 // AUTO-LOGIN — entra automático se já tiver sessão salva
 // ══════════════════════════════════════════════════
-window.addEventListener('DOMContentLoaded', function() {
+window.addEventListener('DOMContentLoaded', async function() {
   try {
     const savedUser = localStorage.getItem('fp_user');
-    if (!savedUser) return; // 1ª visita — deixa tela de login normal
+    if (!savedUser) return;
     const user = JSON.parse(savedUser);
     if (!user || !user.email) return;
-    // Usuário já cadastrado — entra automaticamente
-    state.user     = user;
+    state.user = user;
     state.sheetsId = localStorage.getItem('fp_sheets_id_' + user.email) || null;
-    // Restaura token OAuth da sessionStorage (evita popup desnecessário)
     const sessToken  = sessionStorage.getItem('fp_access_token');
     const sessExpiry = parseInt(sessionStorage.getItem('fp_token_expiry') || '0');
     if (sessToken && Date.now() < sessExpiry) {
       state.accessToken = sessToken;
       state.tokenExpiry = sessExpiry;
     }
-    // Aguarda Google SDK carregar para inicializar token (silencioso)
-    function tryInit() {
+    // Atualiza sheetsId da coluna N (servidor) — corrige cache errado do celular
+    await refreshSheetsIdFromServer(user.email);
+    async function tryInit() {
       if (window.google && google.accounts && google.accounts.oauth2) {
         _inicializarTokenClient();
       }
       initApp();
     }
-    // Pequeno delay para garantir que o SDK carregou
     if (window.google && google.accounts) {
       tryInit();
     } else {
