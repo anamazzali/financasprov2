@@ -42,8 +42,14 @@ const BANCOS_LISTA = [
   { nome:'XP',             cor:'#000000', emoji:'⚫' },
   { nome:'Pan',            cor:'#004A97', emoji:'🔵' },
   { nome:'Amazon',         cor:'#FF9900', emoji:'🟠' },
+  { nome:'Wise',           cor:'#9FE870', emoji:'🟢' },
+  { nome:'Nomad',          cor:'#FF6B35', emoji:'🟠' },
   { nome:'Outro',          cor:'#2D6A4F', emoji:'💳' },
 ];
+
+const MAX_CONTAS = 15; // validação Ana — Premium SaaS: 6
+const TIPO_CONTA_LABEL = { corrente: 'Corrente', poupanca: 'Poupança', investimento: 'Investimento' };
+const TIPO_CONTA_ICON  = { corrente: '🏦', poupanca: '🐷', investimento: '📈' };
 
 // ══════════════════════════════════════════════════
 // CORES DOS BANCOS — automático por nome
@@ -316,6 +322,7 @@ const state = {
   user:         null,
   lancamentos:  [],
   cartoes:      [],
+  contas:       [],
   currentMonth: new Date().getMonth(),
   currentYear:  new Date().getFullYear(),
   editId:       null,
@@ -399,7 +406,7 @@ function showAccessDenied() {
 
 function logout() {
   if (!confirm('Deseja sair do FinançasPro?')) return;
-  state.user = null; state.lancamentos = []; state.cartoes = [];
+  state.user = null; state.lancamentos = []; state.cartoes = []; state.contas = [];
   destroyAllCharts();
   localStorage.removeItem('fp_user');
   $('loginScreen').style.display = 'flex';
@@ -459,13 +466,16 @@ function loadLocal() {
   try {
     const l = localStorage.getItem('fp_lancamentos');
     const c = localStorage.getItem('fp_cartoes');
+    const ct = localStorage.getItem('fp_contas');
     if (l) state.lancamentos = JSON.parse(l);
     if (c) state.cartoes     = JSON.parse(c);
+    if (ct) state.contas     = JSON.parse(ct);
   } catch(e) {}
 }
 function saveLocal() {
   localStorage.setItem('fp_lancamentos', JSON.stringify(state.lancamentos));
   localStorage.setItem('fp_cartoes',     JSON.stringify(state.cartoes));
+  localStorage.setItem('fp_contas',      JSON.stringify(state.contas));
 }
 
 // ══════════════════════════════════════════════════
@@ -538,10 +548,12 @@ async function garantirToken(forcarPopup = false) {
 // ══════════════════════════════════════════════════
 
 // Cabeçalhos das abas
-const CAB_LANC  = ['ID','Tipo','Descrição','Valor','Categoria','Data','Observação','Pagamento','Recorrente','CartaoID'];
+const CAB_LANC  = ['ID','Tipo','Descrição','Valor','Categoria','Data','Observação','Pagamento','Recorrente','CartaoID','ContaID'];
 const CAB_CART  = ['ID','Nome','Limite','Fechamento','Vencimento','Cor','CorCustom'];
 const ABA_CAT   = '📂 Categorias';
+const ABA_CONTA = '🏦 Contas';
 const CAB_CAT   = ['Tipo','Categoria'];
+const CAB_CONTA = ['ID','Nome','Banco','Tipo','SaldoInicial','Cor','CorCustom','Ativo'];
 
 function _catsToRows(desp, rec) {
   const rows = [CAB_CAT];
@@ -725,6 +737,7 @@ async function criarPlanilhaCliente() {
           { properties: { title: '💰 Lançamentos' } },
           { properties: { title: '💳 Cartões' } },
           { properties: { title: ABA_CAT } },
+          { properties: { title: ABA_CONTA } },
         ]
       }),
     });
@@ -744,6 +757,7 @@ async function criarPlanilhaCliente() {
             { range: "'💰 Lançamentos'!A1", values: [CAB_LANC] },
             { range: "'💳 Cartões'!A1",     values: [CAB_CART] },
             { range: `'${ABA_CAT}'!A1`,      values: _catsToRows(_CATS_DESP_DEFAULT, _CATS_REC_DEFAULT) },
+            { range: `'${ABA_CONTA}'!A1`,    values: [CAB_CONTA] },
           ]
         }),
       }
@@ -948,22 +962,28 @@ async function _syncParaSheetsCliente() {
   }
 
   // Garante que as abas existem antes de tentar escrever
-  await _garantirAbas(['💰 Lançamentos', '💳 Cartões', ABA_CAT]);
+  await _garantirAbas(['💰 Lançamentos', '💳 Cartões', ABA_CAT, ABA_CONTA]);
 
   const rowsLanc = [CAB_LANC, ...state.lancamentos.map(l => [
     l.id||'', l.tipo||'', l.descricao||'', l.valor||0, l.categoria||'',
     l.data||'', l.obs||'', l.pagamento||'',
-    l.recorrente ? 'TRUE' : 'FALSE', l.cartaoId||'',
+    l.recorrente ? 'TRUE' : 'FALSE', l.cartaoId||'', l.contaId||'',
   ])];
   const rowsCart = [CAB_CART, ...state.cartoes.map(c => [
     c.id||'', c.nome||'', c.limite||0, c.fechamento||15, c.vencimento||22,
     c.cor||'#2D6A4F', c.corCustom ? 'TRUE' : 'FALSE',
   ])];
+  const rowsCont = [CAB_CONTA, ...state.contas.map(c => [
+    c.id||'', c.nome||'', c.banco||'', c.tipo||'corrente',
+    c.saldoInicial||0, c.cor||'#2D6A4F', c.corCustom ? 'TRUE' : 'FALSE',
+    c.ativo !== false ? 'TRUE' : 'FALSE',
+  ])];
 
   const okL = await fpSheetsEscrever('💰 Lançamentos', rowsLanc);
   const okC = await fpSheetsEscrever('💳 Cartões', rowsCart);
   const okCat = await fpSheetsEscrever(ABA_CAT, _catsToRows(getCatDespesa(), getCatReceita()));
-  return okL && okC && okCat;
+  const okCont = await fpSheetsEscrever(ABA_CONTA, rowsCont);
+  return okL && okC && okCat && okCont;
 }
 
 async function loadFromSheets() {
@@ -984,6 +1004,7 @@ async function loadFromSheets() {
         pagamento:  String(r[7]||''),
         recorrente: String(r[8]||'').toUpperCase() === 'TRUE',
         cartaoId:   String(r[9]||''),
+        contaId:    String(r[10]||''),
       }));
     } else if (rowsL.length === 1) {
       // Só o cabeçalho — planilha ainda vazia: mantém dados locais para não perder lançamentos não sincronizados
@@ -1004,6 +1025,20 @@ async function loadFromSheets() {
       }));
     } else if (rowsC.length === 1) {
       // Só o cabeçalho — planilha ainda vazia: mantém dados locais
+    }
+    // Contas bancárias
+    const rowsCt = await fpSheetsLer(ABA_CONTA);
+    if (rowsCt.length > 1) {
+      state.contas = rowsCt.slice(1).filter(r => r[0]).map(r => ({
+        id:           String(r[0]||''),
+        nome:         String(r[1]||''),
+        banco:        String(r[2]||''),
+        tipo:         String(r[3]||'corrente'),
+        saldoInicial: parseFloat(r[4])||0,
+        cor:          String(r[5]||'#2D6A4F'),
+        corCustom:    String(r[6]||'').toUpperCase() === 'TRUE',
+        ativo:        String(r[7]||'TRUE').toUpperCase() !== 'FALSE',
+      }));
     }
     // Categorias — planilha prevalece no sync manual (↓)
     const catsOk = await loadCatsFromSheets({ merge: false });
@@ -1148,12 +1183,57 @@ function getSaldoValeTransp(mesAtual, anoAtual) {
 }
 
 // ══════════════════════════════════════════════════
-// RENDER ALL
+// SALDO ACUMULADO — CAIXA GERAL (carry-over mensal)
+// Igual ao Ticket Alimentação: soma receitas − despesas em caixa
+// desde o início até o mês visualizado (inclusive).
+// Exclui: Vale Alimentação/Transporte (buckets próprios) e
+// despesas no cartão de crédito (saem do caixa ao pagar a fatura).
 // ══════════════════════════════════════════════════
+function _lancamentoAteMes(l, mesAtual, anoAtual) {
+  const d = new Date(l.data + 'T12:00:00');
+  const m = d.getMonth(), y = d.getFullYear();
+  return !(y > anoAtual || (y === anoAtual && m > mesAtual));
+}
+
+function _isReceitaTicket(l) {
+  return l.tipo === 'receita' &&
+    (l.categoria === 'Vale Alimentação' || l.categoria === 'Vale Transporte');
+}
+
+function _isDespesaTicket(l) {
+  const pag = l.pagamento || '';
+  return pag.includes('Vale Alimentação') || pag.includes('Vale Transporte');
+}
+
+function _isDespesaCartaoCredito(l) {
+  return l.tipo === 'despesa' && (l.pagamento || '').includes('Crédito');
+}
+
+function getSaldoAcumuladoGeral(mesAtual, anoAtual) {
+  let saldo = 0;
+  state.lancamentos.forEach(l => {
+    if (!_lancamentoAteMes(l, mesAtual, anoAtual)) return;
+    if (_isReceitaTicket(l)) return;
+    if (l.tipo === 'receita') {
+      saldo += parseFloat(l.valor || 0);
+    } else if (l.tipo === 'despesa') {
+      if (_isDespesaTicket(l) || _isDespesaCartaoCredito(l)) return;
+      saldo -= parseFloat(l.valor || 0);
+    }
+  });
+  return saldo;
+}
+
+function getMesAnteriorRef(mesAtual, anoAtual) {
+  let m = mesAtual - 1, y = anoAtual;
+  if (m < 0) { m = 11; y--; }
+  return { mes: m, ano: y };
+}
 function renderAll() {
   try { renderDashboard(); }    catch(e) { console.warn('renderDashboard:', e); }
   try { renderLancamentos(); }  catch(e) { console.warn('renderLancamentos:', e); }
   try { renderCartoes(); }      catch(e) { console.warn('renderCartoes:', e); }
+  try { renderContas(); }       catch(e) { console.warn('renderContas:', e); }
   const active = document.querySelector('.tab-content[style*="block"]');
   if (active) {
     const id = active.id;
@@ -1164,6 +1244,7 @@ function renderAll() {
       if (id==='tab-dre')            renderDRE();
       if (id==='tab-analise-cartao') renderAnaliseCartao();
       if (id==='tab-fluxo')          renderFluxo();
+      if (id==='tab-contas')         renderContas();
     } catch(e) { console.warn('renderTab:', e); }
   }
 }
@@ -1211,13 +1292,28 @@ function renderDashboard() {
   const items   = getLancamentosMes();
   const receita = sumBy(items,'receita');
   const despesa = sumBy(items,'despesa');
-  const saldo   = receita-despesa;
-  const taxa    = receita>0?Math.round((saldo/receita)*100):0;
+  const saldoMes = receita - despesa;
+  const taxa    = receita>0?Math.round((saldoMes/receita)*100):0;
+
+  const saldoAcum = getSaldoAcumuladoGeral(state.currentMonth, state.currentYear);
+  const prev = getMesAnteriorRef(state.currentMonth, state.currentYear);
+  const saldoAteMesAnterior = getSaldoAcumuladoGeral(prev.mes, prev.ano);
+  const sobraMesAnterior = saldoAteMesAnterior;
 
   $('totalReceita').textContent = fmt(receita);
   $('totalDespesa').textContent = fmt(despesa);
-  $('totalSaldo').textContent   = fmt(saldo);
+  $('totalSaldo').textContent   = fmt(saldoAcum);
   $('taxaEconomia').textContent = `${taxa}%`;
+
+  const elSaldoSub = $('totalSaldoSub');
+  if (elSaldoSub) {
+    const nomeMesAnt = MONTHS[prev.mes];
+    elSaldoSub.textContent = saldoMes !== 0
+      ? `Sobra ${nomeMesAnt}: ${fmt(sobraMesAnterior)} · Este mês: ${fmt(saldoMes)}`
+      : `Sobra ${nomeMesAnt}: ${fmt(sobraMesAnterior)} · inclui meses anteriores`;
+  }
+  const cardSaldo = $('totalSaldo')?.closest('.kpi-card');
+  if (cardSaldo) cardSaldo.className = 'kpi-card ' + (saldoAcum >= 0 ? 'kpi-saldo' : 'kpi-despesa');
 
   // KPI — Saldo acumulado do Ticket Alimentação
   const saldoVA = getSaldoValeAlim(state.currentMonth, state.currentYear);
@@ -1521,6 +1617,7 @@ function renderLancamentos() {
         <div class="lanc-meta">
           <span class="lanc-badge">${escHtml(l.categoria)}</span>
           ${l.pagamento?`<span class="lanc-badge">${escHtml(l.pagamento)}</span>`:''}
+          ${l.contaId && getContaById(l.contaId)?`<span class="lanc-badge conta-badge">🏦 ${escHtml(getContaById(l.contaId).nome)}</span>`:''}
           <span>${formatDate(l.data)}</span>
           ${l.recorrente?'<span class="lanc-badge recorrente">🔄 Recorrente</span>':''}
           ${l.parcelado?`<span class="lanc-badge parcelado">💳 ${l.parcelaAtual}/${l.nParcelas} parcelas</span>`:''}
@@ -1617,6 +1714,7 @@ function openModal(edit=null) {
   updateCategorias();
   if (edit) $('fCategoria').value = edit.categoria;
   toggleCartaoRow();
+  if (edit && edit.contaId && $('fConta')) $('fConta').value = edit.contaId;
   updateTipoColor();
   if (isParcelado) calcularParcelamento();
   // Aplica trava do Vale Alimentação ao abrir modal com item existente
@@ -1630,6 +1728,7 @@ function toggleCartaoRow() {
   const isReceita = $('fTipo').value === 'receita';
   const show = isCredito;
   $('cartaoRow').style.display = show ? 'flex' : 'none';
+  if ($('contaRow')) $('contaRow').style.display = show ? 'none' : 'flex';
   // Parcelamento: só para despesas no cartão de crédito
   $('parcelamentoRow').style.display = (show && !isReceita) ? 'block' : 'none';
   if (!show || isReceita) {
@@ -1640,7 +1739,34 @@ function toggleCartaoRow() {
     $('fCartao').innerHTML = state.cartoes.length
       ? state.cartoes.map(c => `<option value="${c.id}">${escHtml(c.nome)}</option>`).join('')
       : '<option value="">Nenhum cartão cadastrado</option>';
+  } else {
+    populateContaSelect();
   }
+}
+
+function populateContaSelect() {
+  const sel = $('fConta');
+  if (!sel) return;
+  const ativas = state.contas.filter(c => c.ativo !== false);
+  sel.innerHTML = '<option value="">— Selecione a conta —</option>' +
+    ativas.map(c => `<option value="${c.id}">${TIPO_CONTA_ICON[c.tipo]||'🏦'} ${escHtml(c.nome)}</option>`).join('');
+}
+
+function getContaById(id) {
+  return state.contas.find(c => c.id === id) || null;
+}
+
+function calcSaldoConta(contaId) {
+  const conta = getContaById(contaId);
+  if (!conta) return 0;
+  let saldo = parseFloat(conta.saldoInicial) || 0;
+  state.lancamentos.forEach(l => {
+    if (l.contaId !== contaId) return;
+    const v = parseFloat(l.valor) || 0;
+    if (l.tipo === 'receita') saldo += v;
+    else saldo -= v;
+  });
+  return saldo;
 }
 
 function toggleParcelamento() {
@@ -1778,18 +1904,19 @@ function saveLancamento() {
   } : { parcelado: false };
 
   const cartaoId = pag.includes('Crédito') ? ($('fCartao').value || '') : '';
+  const contaId  = !pag.includes('Crédito') ? ($('fConta')?.value || '') : '';
 
   if(state.editId){
     const idx=state.lancamentos.findIndex(l=>l.id===state.editId);
     if(idx!==-1){
-      state.lancamentos[idx]={...state.lancamentos[idx],tipo,descricao:desc,valor,categoria:cat,data,pagamento:pag,obs,recorrente:rec,cartaoId,...parcelInfo};
+      state.lancamentos[idx]={...state.lancamentos[idx],tipo,descricao:desc,valor,categoria:cat,data,pagamento:pag,obs,recorrente:rec,cartaoId,contaId,...parcelInfo};
       saveToSheets(state.lancamentos[idx]);
     }
   } else {
     const novo={
       id:'l_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),
       tipo,descricao:desc,valor,categoria:cat,data,pagamento:pag,obs,recorrente:rec,
-      cartaoId,...parcelInfo,
+      cartaoId,contaId,...parcelInfo,
     };
     state.lancamentos.push(novo);
     saveToSheets(novo);
@@ -1812,6 +1939,216 @@ function deleteLancamento(id){
   saveLocal();
   sheetsPOST({ action:'deleteData', email:state.user.email, lancamentoId:id });
   renderAll();
+}
+
+// ══════════════════════════════════════════════════
+// CONTAS BANCÁRIAS
+// ══════════════════════════════════════════════════
+let _bancoSelecionadoConta = null;
+let _editContaId = null;
+let _filtroContaTipo = '';
+
+function renderContas() {
+  const el = $('contasList');
+  const sumEl = $('contasSummary');
+  if (!el) return;
+
+  const contas = state.contas.filter(c => c.ativo !== false);
+  const filtradas = _filtroContaTipo
+    ? contas.filter(c => c.tipo === _filtroContaTipo)
+    : contas;
+
+  if (sumEl) {
+    const totais = { corrente: 0, poupanca: 0, investimento: 0 };
+    contas.forEach(c => { totais[c.tipo] = (totais[c.tipo] || 0) + calcSaldoConta(c.id); });
+    const totalGeral = totais.corrente + totais.poupanca + totais.investimento;
+    sumEl.innerHTML = `
+      <div class="contas-kpi-grid">
+        <div class="contas-kpi"><span>🏦 Corrente</span><strong style="color:var(--verde-escuro);">${fmt(totais.corrente)}</strong></div>
+        <div class="contas-kpi"><span>🐷 Poupança</span><strong style="color:var(--verde-medio);">${fmt(totais.poupanca)}</strong></div>
+        <div class="contas-kpi"><span>📈 Investimento</span><strong style="color:var(--dourado-escuro);">${fmt(totais.investimento)}</strong></div>
+        <div class="contas-kpi contas-kpi-total"><span>💰 Total</span><strong>${fmt(totalGeral)}</strong></div>
+      </div>
+      <div class="contas-filtros">
+        <button type="button" class="contas-filtro-btn ${_filtroContaTipo===''?'active':''}" onclick="filtrarContas('')">Todas (${contas.length})</button>
+        <button type="button" class="contas-filtro-btn ${_filtroContaTipo==='corrente'?'active':''}" onclick="filtrarContas('corrente')">Corrente</button>
+        <button type="button" class="contas-filtro-btn ${_filtroContaTipo==='poupanca'?'active':''}" onclick="filtrarContas('poupanca')">Poupança</button>
+        <button type="button" class="contas-filtro-btn ${_filtroContaTipo==='investimento'?'active':''}" onclick="filtrarContas('investimento')">Investimento</button>
+      </div>`;
+  }
+
+  if (!filtradas.length) {
+    el.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:52px 20px;color:var(--texto-medio);">
+      <div style="font-size:2.5rem;margin-bottom:14px;">🏦</div>
+      <p style="font-weight:600;margin-bottom:6px;">Nenhuma conta cadastrada</p>
+      <p style="font-size:0.85rem;">Clique em "+ Nova Conta" para cadastrar corrente, poupança ou investimento.</p></div>`;
+    return;
+  }
+
+  el.innerHTML = filtradas.map(c => {
+    const saldo = calcSaldoConta(c.id);
+    const corAuto = getCorBanco(c.banco || c.nome);
+    const bg = c.corCustom ? c.cor : corAuto.bg;
+    const bgEsc = darkenHex(bg, 30);
+    const tipoLabel = TIPO_CONTA_LABEL[c.tipo] || c.tipo;
+    const mes = getLancamentosMes().filter(l => l.contaId === c.id);
+    const movMes = mes.reduce((s, l) => s + (l.tipo === 'receita' ? 1 : -1) * parseFloat(l.valor || 0), 0);
+    return `
+      <div class="cartao-card conta-card" style="background:linear-gradient(135deg,${bg},${bgEsc});">
+        <div class="conta-tipo-badge">${TIPO_CONTA_ICON[c.tipo]||'🏦'} ${tipoLabel}</div>
+        <div class="cartao-nome">${escHtml(c.nome)}</div>
+        <div class="cartao-fatura">${escHtml(c.banco || '')}</div>
+        <div class="cartao-gasto" style="color:${saldo>=0?'#fff':'#ffcdd2'};">${fmt(saldo)}</div>
+        <div class="cartao-bar-track" style="opacity:0.35;"><div class="cartao-bar-fill" style="width:100%;background:rgba(255,255,255,0.5);"></div></div>
+        <div class="cartao-footer">
+          <span>Mês: ${movMes>=0?'+':''}${fmt(movMes)}</span>
+          <div style="display:flex;gap:6px;">
+            <button onclick="editConta('${c.id}')"
+              style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fff;cursor:pointer;border-radius:6px;padding:3px 8px;font-size:0.75rem;">✏️</button>
+            <button onclick="deleteConta('${c.id}')"
+              style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.8);cursor:pointer;border-radius:6px;padding:3px 8px;font-size:0.75rem;">🗑️</button>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function filtrarContas(tipo) {
+  _filtroContaTipo = tipo;
+  renderContas();
+}
+
+function openContaModal(edit = null) {
+  if (!edit && state.contas.filter(c => c.ativo !== false).length >= MAX_CONTAS) {
+    alert(`Limite de ${MAX_CONTAS} contas atingido.`); return;
+  }
+  _bancoSelecionadoConta = null;
+  _editContaId = edit ? edit.id : null;
+
+  $('ctNome').value = edit ? edit.nome : '';
+  $('ctTipo').value = edit ? (edit.tipo || 'corrente') : 'corrente';
+  $('ctSaldo').value = edit ? (edit.saldoInicial || 0) : '';
+  $('ctCor').value = edit ? (edit.cor || '#2D6A4F') : '#2D6A4F';
+  $('ctCorCustom').checked = edit ? !!edit.corCustom : false;
+  $('ctCorRow').style.display = (edit && edit.corCustom) ? 'flex' : 'none';
+
+  document.querySelector('#contaModal .modal-header h3').textContent =
+    edit ? 'Editar Conta' : 'Nova Conta Bancária';
+
+  const grid = $('contaBancoGrid');
+  if (grid) grid.innerHTML = BANCOS_LISTA.map((b, i) => `
+    <button type="button" class="banco-btn" onclick="selecionarBancoConta(${i})" id="conta-banco-btn-${i}">
+      <div class="banco-btn-cor" style="background:${b.cor};"></div>
+      <div class="banco-btn-label">${b.nome}</div>
+    </button>`).join('');
+
+  if (edit && edit.banco) {
+    const idx = BANCOS_LISTA.findIndex(b =>
+      edit.banco.toLowerCase().includes(b.nome.toLowerCase()) ||
+      b.nome.toLowerCase().includes(edit.banco.toLowerCase())
+    );
+    if (idx >= 0) {
+      _bancoSelecionadoConta = BANCOS_LISTA[idx];
+      setTimeout(() => {
+        document.querySelectorAll('#contaBancoGrid .banco-btn').forEach((btn, i) =>
+          btn.classList.toggle('selected', i === idx));
+      }, 50);
+    }
+  }
+
+  atualizarPreviewConta();
+  $('contaModal').style.display = 'flex';
+}
+
+function editConta(id) {
+  const c = state.contas.find(x => x.id === id);
+  if (c) openContaModal(c);
+}
+
+function selecionarBancoConta(idx) {
+  _bancoSelecionadoConta = BANCOS_LISTA[idx];
+  document.querySelectorAll('#contaBancoGrid .banco-btn').forEach((btn, i) => {
+    btn.classList.toggle('selected', i === idx);
+  });
+  if (!$('ctNome').value.trim() && _bancoSelecionadoConta.nome !== 'Outro') {
+    onCtTipoChange();
+  }
+  atualizarPreviewConta();
+}
+
+function onCtTipoChange() {
+  if (_bancoSelecionadoConta && _bancoSelecionadoConta.nome !== 'Outro') {
+    const sufixo = TIPO_CONTA_LABEL[$('ctTipo').value] || '';
+    $('ctNome').value = `${_bancoSelecionadoConta.nome} ${sufixo}`.trim();
+  }
+  atualizarPreviewConta();
+}
+
+function atualizarPreviewConta() {
+  const preview = $('contaPreview');
+  if (!preview) return;
+  const corCustom = $('ctCorCustom')?.checked;
+  const cor = corCustom ? $('ctCor').value : (_bancoSelecionadoConta ? _bancoSelecionadoConta.cor : '#2D6A4F');
+  preview.style.background = `linear-gradient(135deg, ${cor}, ${darkenHex(cor, 30)})`;
+  const nomeEl = $('contaPreviewName');
+  const saldoEl = $('contaPreviewSaldo');
+  const nome = $('ctNome').value.trim() || (_bancoSelecionadoConta ? _bancoSelecionadoConta.nome : 'Minha Conta');
+  const saldo = parseFloat($('ctSaldo').value) || 0;
+  if (nomeEl) nomeEl.textContent = nome;
+  if (saldoEl) saldoEl.textContent = `Saldo inicial: ${fmt(saldo)}`;
+}
+
+function closeContaModal() { $('contaModal').style.display = 'none'; }
+
+function toggleCorCustomConta() {
+  $('ctCorRow').style.display = $('ctCorCustom').checked ? 'flex' : 'none';
+  atualizarPreviewConta();
+}
+
+function saveConta() {
+  const nomeInput = $('ctNome').value.trim();
+  const banco = _bancoSelecionadoConta ? _bancoSelecionadoConta.nome : (nomeInput.split(' ')[0] || '');
+  const nome = nomeInput || (_bancoSelecionadoConta ? _bancoSelecionadoConta.nome : '');
+  const tipo = $('ctTipo').value || 'corrente';
+  const saldoInicial = parseFloat($('ctSaldo').value) || 0;
+  const corCustom = $('ctCorCustom').checked;
+  const cor = corCustom
+    ? $('ctCor').value
+    : (_bancoSelecionadoConta ? _bancoSelecionadoConta.cor : '#2D6A4F');
+
+  if (!nome) { alert('Informe um nome/apelido para a conta.'); return; }
+
+  if (_editContaId) {
+    const idx = state.contas.findIndex(c => c.id === _editContaId);
+    if (idx !== -1) {
+      state.contas[idx] = { ...state.contas[idx], nome, banco, tipo, saldoInicial, cor, corCustom, ativo: true };
+    }
+  } else {
+    state.contas.push({
+      id: 'ct_' + Date.now(),
+      nome, banco, tipo, saldoInicial, cor, corCustom, ativo: true,
+    });
+  }
+
+  saveLocal();
+  _syncParaSheetsCliente().catch(e => console.warn('[Contas] sync:', e));
+  closeContaModal();
+  renderContas();
+}
+
+function deleteConta(id) {
+  const usada = state.lancamentos.some(l => l.contaId === id);
+  const msg = usada
+    ? 'Esta conta tem lançamentos vinculados.\n\nDeseja desativar (ocultar) em vez de apagar os lançamentos?'
+    : 'Remover esta conta?';
+  if (!confirm(msg)) return;
+  const idx = state.contas.findIndex(c => c.id === id);
+  if (idx !== -1) {
+    state.contas[idx].ativo = false;
+    saveLocal();
+    _syncParaSheetsCliente().catch(e => console.warn('[Contas] sync:', e));
+    renderContas();
+  }
 }
 
 // ══════════════════════════════════════════════════
@@ -2555,6 +2892,7 @@ function renderComparativoSummary(rows) {
 // ══════════════════════════════════════════════════
 const TAB_TITLES = {
   dashboard:'Dashboard', lancamentos:'Lançamentos', cartoes:'Cartões de Crédito',
+  contas:'Contas Bancárias',
   relatorios:'Relatório Mensal', comparativo:'Comparativo Mensal',
   dre:'DRE — Resultado', caixinhas:'Método das Caixinhas',
   'analise-cartao':'Análise por Cartão', fluxo:'Fluxo de Caixa',
@@ -2598,6 +2936,7 @@ function switchTab(tab) {
     if (tab==='comparativo')    renderComparativo();
     if (tab==='dre')            renderDRE();
     if (tab==='caixinhas')      renderCaixinhas();
+    if (tab==='contas')         renderContas();
     if (tab==='analise-cartao') renderAnaliseCartao();
     if (tab==='fluxo')          renderFluxo();
     if (tab==='configuracoes')  updateConfigPanel();
@@ -2692,7 +3031,7 @@ async function sincronizarAgora(){
   localStorage.setItem('fp_ultimo_sync',agora);
   if($('configUltimoSync')) $('configUltimoSync').textContent=new Date(agora).toLocaleString('pt-BR');
   if($('configTotalLanc'))  $('configTotalLanc').textContent=state.lancamentos.length;
-  addSyncLog('✅ '+state.lancamentos.length+' lançamentos, '+state.cartoes.length+' cartões e categorias carregados.','ok');
+  addSyncLog('✅ '+state.lancamentos.length+' lançamentos, '+state.cartoes.length+' cartões, '+state.contas.filter(c=>c.ativo!==false).length+' contas e categorias carregados.','ok');
 }
 
 // ENVIAR — sobe dados para Sheets
@@ -2711,7 +3050,7 @@ async function enviarParaSheets(){
     await setupSheetsCliente();
     if(!state.sheetsId){ addSyncLog('Não foi possível localizar ou criar a planilha. Tente novamente.','error'); return; }
   }
-  addSyncLog('Enviando '+state.lancamentos.length+' lançamentos, '+state.cartoes.length+' cartões e categorias...','info');
+  addSyncLog('Enviando '+state.lancamentos.length+' lançamentos, '+state.cartoes.length+' cartões, '+state.contas.filter(c=>c.ativo!==false).length+' contas e categorias...','info');
   var ok=await _syncParaSheetsCliente();
   if(ok){ localStorage.setItem('fp_ultimo_sync',new Date().toISOString()); updateConfigPanel(); addSyncLog('✅ Dados enviados com sucesso!','ok'); }
   else{ addSyncLog('Falha no envio — veja o erro acima.','error'); }
