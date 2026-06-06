@@ -1,4 +1,4 @@
-/* FinançasProV2 — app.js v4.0 */
+/* FinançasProV2 — app.js v3.0 */
 'use strict';
 
 // ══════════════════════════════════════════════════
@@ -321,28 +321,24 @@ function parseJwt(token) {
 
 async function checkAccess(email, payload) {
   try {
-    // Verifica autorização — continua via planilha de clientes do admin
-    const res  = await fetch(`${CONFIG.SHEETS_URL}?action=checkAccess&email=${encodeURIComponent(email)}`);
-    const data = await res.json();
-    if (data.authorized) {
+    // JSONP — compatível com Apps Script (fetch direto falha por CORS)
+    const data = await sheetsGET('action=checkAccess&email=' + encodeURIComponent(email));
+    if (data && data.authorized) {
       state.user     = { email, name: payload.name, picture: payload.picture };
-      state.sheetsId = data.sheetsId || null; // sheetsId salvo de login anterior
-      // Servidor é a fonte de verdade — salva no localStorage para que
-      // auto-login (refresh de página) sempre use o ID correto do servidor
+      state.sheetsId = data.sheetsId || null;
       if (data.sheetsId) {
         localStorage.setItem('fp_sheets_id_' + email, data.sheetsId);
       }
-      // Inicializa o cliente OAuth para Sheets API
       _inicializarTokenClient();
       initApp();
     } else {
       showAccessDenied();
     }
   } catch(e) {
-    console.warn('Servidor offline, modo local:', e);
-    state.user = { email, name: payload.name, picture: payload.picture };
-    _inicializarTokenClient();
-    initApp();
+    console.warn('Erro ao verificar acesso:', e);
+    $('loginLoading').style.display  = 'none';
+    $('googleBtnWrap').style.display = 'flex';
+    alert('Não foi possível conectar ao servidor de autorização.\n\nVerifique sua conexão e tente novamente.\nSe persistir, contate o suporte.');
   }
 }
 
@@ -407,22 +403,14 @@ function initApp() {
   setTimeout(async () => {
     if (!state.tokenClient) _inicializarTokenClient();
     const ok = await garantirToken(true);
-    if (ok) {
-      // Valida o sheetsId ANTES de usar — pode ser inválido vindo do Apps Script
-      // (ex: planilha deletada ou ID antigo registrado no servidor)
-      if (state.sheetsId && !await _validarSheetsId(state.sheetsId)) {
-        state.sheetsId = null;
-        localStorage.removeItem('fp_sheets_id_' + state.user.email);
+    if (ok && state.sheetsId) {
+      // Se já tem planilha configurada e tem dados locais, sobe automaticamente
+      if (state.lancamentos.length > 0 || state.cartoes.length > 0) {
+        await _syncParaSheetsCliente();
       }
-      if (state.sheetsId) {
-        // Planilha válida — sobe dados locais automaticamente
-        if (state.lancamentos.length > 0 || state.cartoes.length > 0) {
-          await _syncParaSheetsCliente();
-        }
-      } else {
-        // Sem planilha válida — busca no Drive ou cria nova
-        await setupSheetsCliente();
-      }
+    } else if (ok && !state.sheetsId) {
+      // Cria planilha se não existir ainda
+      await setupSheetsCliente();
     }
   }, 3000);
   // Primeira visita — abre Comece Aqui automaticamente
