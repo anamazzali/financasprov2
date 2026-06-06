@@ -104,9 +104,12 @@ function getCatDespesa() {
 function getCatReceita() {
   try { const s=localStorage.getItem('fp_cats_receita'); return s?JSON.parse(s):_CATS_REC_DEFAULT; } catch(e){return _CATS_REC_DEFAULT;}
 }
-function saveCats(despesa, receita) {
+function saveCats(despesa, receita, opts) {
   localStorage.setItem('fp_cats_despesa', JSON.stringify(despesa));
   localStorage.setItem('fp_cats_receita', JSON.stringify(receita));
+  if (!opts || opts.sync !== false) {
+    syncCatsToSheets().catch(e => console.warn('[Cats] sync:', e));
+  }
 }
 // Mantém as constantes para compatibilidade com restante do código
 let CATEGORIAS_DESPESA = getCatDespesa();
@@ -114,6 +117,31 @@ let CATEGORIAS_RECEITA = getCatReceita();
 function reloadCats() {
   CATEGORIAS_DESPESA = getCatDespesa();
   CATEGORIAS_RECEITA = getCatReceita();
+}
+function _refreshCatUI(selecionarCat, tipo) {
+  reloadCats();
+  updateCategorias();
+  populateCatFilter();
+  if (!selecionarCat || !$('fCategoria')) return;
+  const modalAberto = $('modal') && $('modal').style.display !== 'none';
+  if (!modalAberto) return;
+  const fTipo = $('fTipo') ? $('fTipo').value : '';
+  const combina = (tipo === 'desp' && fTipo === 'despesa') || (tipo === 'rec' && fTipo === 'receita');
+  if (combina) {
+    $('fCategoria').value = selecionarCat;
+    _aplicarTravaValeAlim();
+  }
+}
+function _bindCatAddEnter() {
+  const bind = (id, tipo) => {
+    const el = $(id);
+    if (!el) return;
+    el.onkeydown = (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); addCatItem(tipo); }
+    };
+  };
+  bind('catNewDesp', 'desp');
+  bind('catNewRec', 'rec');
 }
 const CAT_ICONS = {
   'Moradia':'🏠','Educação':'📚','Transporte':'🚗','Seguros':'🛡️',
@@ -404,6 +432,7 @@ function initApp() {
     if (!state.tokenClient) _inicializarTokenClient();
     const ok = await garantirToken(true);
     if (ok && state.sheetsId) {
+      await loadCatsFromSheetsOrUpload();
       // Se já tem planilha configurada e tem dados locais, sobe automaticamente
       if (state.lancamentos.length > 0 || state.cartoes.length > 0) {
         await _syncParaSheetsCliente();
@@ -511,6 +540,89 @@ async function garantirToken(forcarPopup = false) {
 // Cabeçalhos das abas
 const CAB_LANC  = ['ID','Tipo','Descrição','Valor','Categoria','Data','Observação','Pagamento','Recorrente','CartaoID'];
 const CAB_CART  = ['ID','Nome','Limite','Fechamento','Vencimento','Cor','CorCustom'];
+const ABA_CAT   = '📂 Categorias';
+const CAB_CAT   = ['Tipo','Categoria'];
+
+function _catsToRows(desp, rec) {
+  const rows = [CAB_CAT];
+  desp.forEach(c => rows.push(['despesa', c]));
+  rec.forEach(c => rows.push(['receita', c]));
+  return rows;
+}
+
+function _rowsToCats(rows) {
+  if (!rows || rows.length < 2) return null;
+  const desp = [], rec = [];
+  for (let i = 1; i < rows.length; i++) {
+    const tipo = String(rows[i][0] || '').toLowerCase();
+    const cat  = String(rows[i][1] || '').trim();
+    if (!cat) continue;
+    if (tipo === 'receita') rec.push(cat);
+    else desp.push(cat);
+  }
+  return { despesa: desp, receita: rec };
+}
+
+function _mergeCatLists(local, remote) {
+  const seen = new Set();
+  const out = [];
+  [...local, ...remote].forEach(c => {
+    const k = c.toLowerCase();
+    if (!seen.has(k)) { seen.add(k); out.push(c); }
+  });
+  return out;
+}
+
+function _catsIguais(a, b) {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+async function syncCatsToSheets() {
+  if (!state.sheetsId) return false;
+  if (!state.accessToken || Date.now() >= state.tokenExpiry) return false;
+  await _garantirAbas([ABA_CAT]);
+  const d = getCatDespesa(), r = getCatReceita();
+  return fpSheetsEscrever(ABA_CAT, _catsToRows(d, r));
+}
+
+async function loadCatsFromSheets(opts) {
+  if (!state.sheetsId || !await garantirToken()) return false;
+  const rows = await fpSheetsLer(ABA_CAT);
+  const parsed = _rowsToCats(rows);
+  if (!parsed || (!parsed.despesa.length && !parsed.receita.length)) return false;
+
+  const localD = getCatDespesa();
+  const localR = getCatReceita();
+  let desp = parsed.despesa;
+  let rec  = parsed.receita;
+
+  if (opts && opts.merge) {
+    desp = _mergeCatLists(localD, parsed.despesa);
+    rec  = _mergeCatLists(localR, parsed.receita);
+  }
+
+  saveCats(desp, rec, { sync: false });
+  reloadCats();
+  updateCategorias();
+  populateCatFilter();
+  return true;
+}
+
+async function loadCatsFromSheetsOrUpload() {
+  if (!state.sheetsId || !await garantirToken()) return;
+  const localD = getCatDespesa();
+  const localR = getCatReceita();
+  const loaded = await loadCatsFromSheets({ merge: true });
+  if (loaded) {
+    const newD = getCatDespesa();
+    const newR = getCatReceita();
+    if (!_catsIguais(newD, localD) || !_catsIguais(newR, localR)) {
+      await syncCatsToSheets();
+    }
+  } else {
+    await syncCatsToSheets();
+  }
+}
 
 async function fpSheetsEscrever(aba, valores) {
   if (!state.sheetsId) { addSyncLog('sheetsId não configurado.', 'error'); return false; }
@@ -612,6 +724,7 @@ async function criarPlanilhaCliente() {
         sheets: [
           { properties: { title: '💰 Lançamentos' } },
           { properties: { title: '💳 Cartões' } },
+          { properties: { title: ABA_CAT } },
         ]
       }),
     });
@@ -630,6 +743,7 @@ async function criarPlanilhaCliente() {
           data: [
             { range: "'💰 Lançamentos'!A1", values: [CAB_LANC] },
             { range: "'💳 Cartões'!A1",     values: [CAB_CART] },
+            { range: `'${ABA_CAT}'!A1`,      values: _catsToRows(_CATS_DESP_DEFAULT, _CATS_REC_DEFAULT) },
           ]
         }),
       }
@@ -688,6 +802,9 @@ async function setupSheetsCliente() {
   const jaMigrou = localStorage.getItem('fp_migrado_' + state.user.email);
   if (!jaMigrou) {
     await migrarDadosAntigos();
+  }
+  if (state.sheetsId && state.accessToken && Date.now() < state.tokenExpiry) {
+    await loadCatsFromSheetsOrUpload();
   }
   // loadFromSheets() NÃO é chamado aqui — evita sobrescrever dados locais não sincronizados.
   // Use o botão "Sincronizar ↓" para baixar dados do Sheets explicitamente.
@@ -831,7 +948,7 @@ async function _syncParaSheetsCliente() {
   }
 
   // Garante que as abas existem antes de tentar escrever
-  await _garantirAbas(['💰 Lançamentos', '💳 Cartões']);
+  await _garantirAbas(['💰 Lançamentos', '💳 Cartões', ABA_CAT]);
 
   const rowsLanc = [CAB_LANC, ...state.lancamentos.map(l => [
     l.id||'', l.tipo||'', l.descricao||'', l.valor||0, l.categoria||'',
@@ -845,7 +962,8 @@ async function _syncParaSheetsCliente() {
 
   const okL = await fpSheetsEscrever('💰 Lançamentos', rowsLanc);
   const okC = await fpSheetsEscrever('💳 Cartões', rowsCart);
-  return okL && okC;
+  const okCat = await fpSheetsEscrever(ABA_CAT, _catsToRows(getCatDespesa(), getCatReceita()));
+  return okL && okC && okCat;
 }
 
 async function loadFromSheets() {
@@ -887,6 +1005,9 @@ async function loadFromSheets() {
     } else if (rowsC.length === 1) {
       // Só o cabeçalho — planilha ainda vazia: mantém dados locais
     }
+    // Categorias — planilha prevalece no sync manual (↓)
+    const catsOk = await loadCatsFromSheets({ merge: false });
+    if (!catsOk) await syncCatsToSheets();
     // Se rowsC.length === 0: possível erro de API/token — mantém dados locais
     saveLocal();
     renderAll();
@@ -1306,48 +1427,67 @@ function openCatModal() {
   if (el) el.innerHTML = `
     <div class="cat-section">
       <div class="cat-section-title">🔴 Categorias de Despesa</div>
-      <div id="catListDesp">${renderList(d,'desp')}</div>
       <div class="cat-add-row">
         <input type="text" id="catNewDesp" placeholder="Nova categoria de despesa..." class="cat-input" />
-        <button onclick="addCatItem('desp')" class="btn-cat-add">+ Adicionar</button>
+        <button type="button" onclick="addCatItem('desp')" class="btn-cat-add">+ Adicionar</button>
       </div>
+      <div id="catListDesp">${renderList(d,'desp')}</div>
     </div>
     <div class="cat-section">
       <div class="cat-section-title">🟢 Categorias de Receita</div>
-      <div id="catListRec">${renderList(r,'rec')}</div>
       <div class="cat-add-row">
         <input type="text" id="catNewRec" placeholder="Nova categoria de receita..." class="cat-input" />
-        <button onclick="addCatItem('rec')" class="btn-cat-add">+ Adicionar</button>
+        <button type="button" onclick="addCatItem('rec')" class="btn-cat-add">+ Adicionar</button>
       </div>
+      <div id="catListRec">${renderList(r,'rec')}</div>
     </div>`;
   $('catModal').style.display = 'flex';
+  _bindCatAddEnter();
 }
-function closeCatModal() { $('catModal').style.display = 'none'; }
+function closeCatModal() {
+  $('catModal').style.display = 'none';
+  _refreshCatUI();
+}
 
 function addCatItem(tipo) {
   const inp = tipo==='desp' ? $('catNewDesp') : $('catNewRec');
+  if (!inp) return;
   const nome = inp.value.trim();
-  if (!nome) return;
+  if (!nome) { alert('Digite o nome da nova categoria.'); inp.focus(); return; }
   const d = getCatDespesa(), r = getCatReceita();
-  if (tipo==='desp') { if (!d.includes(nome)) d.push(nome); saveCats(d,r); }
-  else               { if (!r.includes(nome)) r.push(nome); saveCats(d,r); }
-  reloadCats(); inp.value=''; openCatModal();
+  const lista = tipo==='desp' ? d : r;
+  if (lista.some(c => c.toLowerCase() === nome.toLowerCase())) {
+    alert('Esta categoria já existe.'); inp.focus(); return;
+  }
+  if (tipo==='desp') d.push(nome); else r.push(nome);
+  saveCats(d, r);
+  _refreshCatUI(nome, tipo);
+  inp.value = '';
+  openCatModal();
+  setTimeout(() => { (tipo==='desp' ? $('catNewDesp') : $('catNewRec'))?.focus(); }, 50);
 }
 function removeCatItem(tipo, idx) {
   if (!confirm('Remover esta categoria?')) return;
   const d = getCatDespesa(), r = getCatReceita();
   if (tipo==='desp') { d.splice(idx,1); saveCats(d,r); }
   else               { r.splice(idx,1); saveCats(d,r); }
-  reloadCats(); openCatModal();
+  _refreshCatUI();
+  openCatModal();
 }
 function editCatItem(tipo, idx) {
   const d = getCatDespesa(), r = getCatReceita();
   const atual = tipo==='desp' ? d[idx] : r[idx];
   const novo = prompt('Novo nome para a categoria:', atual);
   if (!novo || novo.trim()===atual) return;
-  if (tipo==='desp') { d[idx]=novo.trim(); saveCats(d,r); }
-  else               { r[idx]=novo.trim(); saveCats(d,r); }
-  reloadCats(); openCatModal();
+  const nome = novo.trim();
+  const lista = tipo==='desp' ? d : r;
+  if (lista.some((c, i) => i !== idx && c.toLowerCase() === nome.toLowerCase())) {
+    alert('Já existe outra categoria com esse nome.'); return;
+  }
+  if (tipo==='desp') { d[idx]=nome; saveCats(d,r); }
+  else               { r[idx]=nome; saveCats(d,r); }
+  _refreshCatUI(nome, tipo);
+  openCatModal();
 }
 
 // ══════════════════════════════════════════════════
@@ -2552,7 +2692,7 @@ async function sincronizarAgora(){
   localStorage.setItem('fp_ultimo_sync',agora);
   if($('configUltimoSync')) $('configUltimoSync').textContent=new Date(agora).toLocaleString('pt-BR');
   if($('configTotalLanc'))  $('configTotalLanc').textContent=state.lancamentos.length;
-  addSyncLog('✅ '+state.lancamentos.length+' lançamentos e '+state.cartoes.length+' cartões carregados.','ok');
+  addSyncLog('✅ '+state.lancamentos.length+' lançamentos, '+state.cartoes.length+' cartões e categorias carregados.','ok');
 }
 
 // ENVIAR — sobe dados para Sheets
@@ -2571,7 +2711,7 @@ async function enviarParaSheets(){
     await setupSheetsCliente();
     if(!state.sheetsId){ addSyncLog('Não foi possível localizar ou criar a planilha. Tente novamente.','error'); return; }
   }
-  addSyncLog('Enviando '+state.lancamentos.length+' lançamentos e '+state.cartoes.length+' cartões...','info');
+  addSyncLog('Enviando '+state.lancamentos.length+' lançamentos, '+state.cartoes.length+' cartões e categorias...','info');
   var ok=await _syncParaSheetsCliente();
   if(ok){ localStorage.setItem('fp_ultimo_sync',new Date().toISOString()); updateConfigPanel(); addSyncLog('✅ Dados enviados com sucesso!','ok'); }
   else{ addSyncLog('Falha no envio — veja o erro acima.','error'); }
