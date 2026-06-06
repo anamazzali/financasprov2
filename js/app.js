@@ -641,22 +641,37 @@ async function criarPlanilhaCliente() {
 async function setupSheetsCliente() {
   if (!state.user) return;
 
-  // Se já temos o sheetsId (do checkAccess ou localStorage)
+  // 1. Fonte de verdade primária: sheetsId que veio do servidor via checkAccess
+  // 2. Fallback: localStorage do dispositivo atual (pode estar vazio em novo dispositivo)
   const localId = localStorage.getItem('fp_sheets_id_' + state.user.email);
   if (!state.sheetsId && localId) state.sheetsId = localId;
 
-  // Cria planilha se ainda não existe
+  // 3. Se ainda não encontrou ID, busca SILENCIOSAMENTE no Drive
+  //    — isso resolve o cenário de novo dispositivo (celular, outro PC)
+  //      onde o localStorage está vazio mas a planilha já existe no Drive
+  if (!state.sheetsId) {
+    addSyncLog('Verificando planilha existente no Drive...', 'info');
+    const idExistente = await _buscarPlanilhaSilenciosa();
+    if (idExistente) {
+      state.sheetsId = idExistente;
+      localStorage.setItem('fp_sheets_id_' + state.user.email, idExistente);
+      // Atualiza o servidor com o ID encontrado (sincroniza para todos os dispositivos)
+      await sheetsPOST({ action: 'saveSheetsId', email: state.user.email, sheetsId: idExistente });
+      addSyncLog('✅ Planilha existente localizada e vinculada automaticamente.', 'ok');
+    }
+  }
+
+  // 4. Só cria planilha nova se realmente não existe nenhuma
   if (!state.sheetsId) {
     addSyncLog('Criando sua planilha pessoal...', 'info');
     const novoId = await criarPlanilhaCliente();
     if (novoId) {
       state.sheetsId = novoId;
       localStorage.setItem('fp_sheets_id_' + state.user.email, novoId);
-      // Salva o ID no servidor para acesso multi-dispositivo
       await sheetsPOST({ action: 'saveSheetsId', email: state.user.email, sheetsId: novoId });
     }
   } else {
-    // Garante que está salvo localmente também
+    // Garante que está salvo localmente no dispositivo atual
     localStorage.setItem('fp_sheets_id_' + state.user.email, state.sheetsId);
   }
 
@@ -667,6 +682,34 @@ async function setupSheetsCliente() {
   }
   // loadFromSheets() NÃO é chamado aqui — evita sobrescrever dados locais não sincronizados.
   // Use o botão "Sincronizar ↓" para baixar dados do Sheets explicitamente.
+}
+
+// ──────────────────────────────────────────────────
+// Busca silenciosa de planilha FinançasPro no Drive
+// Não exibe popup, não gera log de erro visível.
+// Retorna o ID da planilha mais recente ou null.
+// ──────────────────────────────────────────────────
+async function _buscarPlanilhaSilenciosa() {
+  // Precisa de token mas sem forçar popup (false = silencioso)
+  if (!await garantirToken(false)) return null;
+  try {
+    const q = encodeURIComponent(
+      "name contains 'FinançasPro' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false"
+    );
+    const res = await fetch(
+      `${DRIVE_API}?q=${q}&fields=files(id,name,modifiedTime)&orderBy=modifiedTime%20desc`,
+      { headers: { 'Authorization': `Bearer ${state.accessToken}` } }
+    );
+    const data = await res.json();
+    if (data.files && data.files.length > 0) {
+      console.log('[Drive] Planilha existente encontrada:', data.files[0].name, data.files[0].id);
+      return data.files[0].id; // a mais recente
+    }
+    return null;
+  } catch(e) {
+    console.warn('[Drive] _buscarPlanilhaSilenciosa:', e);
+    return null;
+  }
 }
 
 // ══════════════════════════════════════════════════
@@ -894,6 +937,30 @@ function getSaldoValeAlim(mesAtual, anoAtual) {
 }
 
 // ══════════════════════════════════════════════════
+// SALDO ACUMULADO — TICKET TRANSPORTE
+// O saldo acumula desde o primeiro lançamento:
+//   +valor de cada receita "Vale Transporte"
+//   -valor de cada despesa  "Transporte"
+// até o mês/ano informados (inclusive).
+// Saldo positivo = sobra carregada para o próximo mês.
+// ══════════════════════════════════════════════════
+function getSaldoValeTransp(mesAtual, anoAtual) {
+  let saldo = 0;
+  state.lancamentos.forEach(l => {
+    const d = new Date(l.data + 'T12:00:00');
+    const m = d.getMonth(), y = d.getFullYear();
+    if (y > anoAtual || (y === anoAtual && m > mesAtual)) return;
+    if (l.tipo === 'receita' && l.categoria === 'Vale Transporte') {
+      saldo += parseFloat(l.valor || 0);
+    }
+    if (l.tipo === 'despesa' && l.categoria === 'Transporte') {
+      saldo -= parseFloat(l.valor || 0);
+    }
+  });
+  return saldo;
+}
+
+// ══════════════════════════════════════════════════
 // RENDER ALL
 // ══════════════════════════════════════════════════
 function renderAll() {
@@ -971,11 +1038,20 @@ function renderDashboard() {
   if (elKpiVA) {
     elKpiVA.textContent = fmt(saldoVA);
     const card = elKpiVA.closest('.kpi-card');
-    if (card) {
-      card.className = 'kpi-card ' + (saldoVA >= 0 ? 'kpi-saldo' : 'kpi-despesa');
-    }
+    if (card) card.className = 'kpi-card ' + (saldoVA >= 0 ? 'kpi-saldo' : 'kpi-despesa');
     const sub = $('kpiSaldoTicketSub');
     if (sub) sub.textContent = saldoVA >= 0 ? '✅ Disponível p/ Alimentação' : '⚠️ Déficit Alimentação';
+  }
+
+  // KPI — Saldo acumulado do Ticket Transporte
+  const saldoVT = getSaldoValeTransp(state.currentMonth, state.currentYear);
+  const elKpiVT = $('kpiSaldoTransporte');
+  if (elKpiVT) {
+    elKpiVT.textContent = fmt(saldoVT);
+    const cardT = elKpiVT.closest('.kpi-card');
+    if (cardT) cardT.className = 'kpi-card ' + (saldoVT >= 0 ? 'kpi-saldo' : 'kpi-despesa');
+    const subT = $('kpiSaldoTransporteSub');
+    if (subT) subT.textContent = saldoVT >= 0 ? '✅ Disponível p/ Transporte' : '⚠️ Déficit Transporte';
   }
 
   const despesas = items.filter(l=>l.tipo==='despesa');
@@ -1460,16 +1536,19 @@ function updateCategorias() {
   _aplicarTravaValeAlim();
 }
 
-// Trava automática: quando tipo=receita + categoria=Vale Alimentação,
+// Trava automática: quando tipo=receita + categoria=Vale Alimentação OU Vale Transporte,
 // o select de categoria fica desabilitado para evitar realocação indevida.
 function _aplicarTravaValeAlim() {
   const fTipo = $('fTipo');
   const fCat  = $('fCategoria');
-  const aviso = $('avisoValeAlim');
   if (!fTipo || !fCat) return;
   const isVA = fTipo.value === 'receita' && fCat.value === 'Vale Alimentação';
-  fCat.disabled = isVA;
-  if (aviso) aviso.style.display = isVA ? 'flex' : 'none';
+  const isVT = fTipo.value === 'receita' && fCat.value === 'Vale Transporte';
+  fCat.disabled = isVA || isVT;
+  const avisoAlim = $('avisoValeAlim');
+  if (avisoAlim) avisoAlim.style.display = isVA ? 'flex' : 'none';
+  const avisoTransp = $('avisoValeTransp');
+  if (avisoTransp) avisoTransp.style.display = isVT ? 'flex' : 'none';
 }
 function saveLancamento() {
   const tipo=$('fTipo').value, desc=$('fDesc').value.trim();
