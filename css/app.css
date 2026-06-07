@@ -1225,3 +1225,62 @@ h1,h2,h3,h4,h5 { font-family: 'Sora', sans-serif; font-weight: 700; }
   white-space: nowrap;
 }
 .btn-cat-add:hover { background: var(--verde-medio); }
+
+/* ══ Contas bancárias ══ */
+.contas-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.contas-kpi {
+  background: #fff;
+  border: 1px solid var(--bege-escuro);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: var(--texto-medio);
+}
+.contas-kpi strong { font-size: 1.05rem; }
+.contas-kpi-total {
+  background: var(--bege-claro);
+  border-color: var(--verde-medio);
+}
+.contas-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.contas-filtro-btn {
+  background: #fff;
+  border: 1px solid var(--bege-escuro);
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 0.78rem;
+  font-family: 'Sora', sans-serif;
+  cursor: pointer;
+  color: var(--texto-medio);
+}
+.contas-filtro-btn.active {
+  background: var(--verde-escuro);
+  color: #fff;
+  border-color: var(--verde-escuro);
+}
+.conta-card { position: relative; }
+.conta-tipo-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.85;
+  margin-bottom: 4px;
+}
+.lanc-badge.conta-badge { background: rgba(27,67,50,0.08); color: var(--verde-escuro); }
+
+@media (max-width: 768px) {
+  .contas-kpi-grid { grid-template-columns: repeat(2, 1fr); }
+}
