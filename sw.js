@@ -1,5 +1,5 @@
 // FinançasPro — Service Worker v2.0
-const CACHE_NAME = 'financaspro-v5';
+const CACHE_NAME = 'financaspro-v6';
 const ASSETS = [
   '/app.html',
   '/css/app.css',
