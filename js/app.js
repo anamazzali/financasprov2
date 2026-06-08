@@ -548,12 +548,54 @@ async function garantirToken(forcarPopup = false) {
 // ══════════════════════════════════════════════════
 
 // Cabeçalhos das abas
-const CAB_LANC  = ['ID','Tipo','Descrição','Valor','Categoria','Data','Observação','Pagamento','Recorrente','CartaoID','ContaID'];
+const CAB_LANC  = ['ID','Tipo','Descrição','Valor','Categoria','Data','Observação','Pagamento','Recorrente','CartaoID','ContaID','Parcelado','ValorTotal','NParcelas','ParcelaAtual','JurosReais'];
 const CAB_CART  = ['ID','Nome','Limite','Fechamento','Vencimento','Cor','CorCustom'];
 const ABA_CAT   = '📂 Categorias';
 const ABA_CONTA = '🏦 Contas';
 const CAB_CAT   = ['Tipo','Categoria'];
 const CAB_CONTA = ['ID','Nome','Banco','Tipo','SaldoInicial','Cor','CorCustom','Ativo'];
+
+function _lancToRow(l) {
+  return [
+    l.id||'', l.tipo||'', l.descricao||'', l.valor||0, l.categoria||'',
+    l.data||'', l.obs||'', l.pagamento||'',
+    l.recorrente ? 'TRUE' : 'FALSE', l.cartaoId||'', l.contaId||'',
+    l.parcelado ? 'TRUE' : 'FALSE',
+    l.parcelado ? (l.valorTotal||0) : '',
+    l.parcelado ? (l.nParcelas||0) : '',
+    l.parcelado ? (l.parcelaAtual||1) : '',
+    l.parcelado ? (l.jurosReais||0) : '',
+  ];
+}
+
+function _rowToLanc(r) {
+  const parcelado = String(r[11]||'').toUpperCase() === 'TRUE';
+  const l = {
+    id:         String(r[0]||''),
+    tipo:       String(r[1]||''),
+    descricao:  String(r[2]||''),
+    valor:      parseFloat(r[3])||0,
+    categoria:  String(r[4]||''),
+    data:       String(r[5]||''),
+    obs:        String(r[6]||''),
+    pagamento:  String(r[7]||''),
+    recorrente: String(r[8]||'').toUpperCase() === 'TRUE',
+    cartaoId:   String(r[9]||''),
+    contaId:    String(r[10]||''),
+    parcelado:  false,
+  };
+  if (parcelado) {
+    l.parcelado    = true;
+    l.valorTotal   = parseFloat(r[12])||0;
+    l.nParcelas    = parseInt(r[13])||0;
+    l.parcelaAtual = parseInt(r[14])||1;
+    l.jurosReais   = parseFloat(r[15])||0;
+    if (l.jurosReais > 0 && l.valorTotal > 0) {
+      l.pctJuros = ((l.jurosReais / l.valorTotal) * 100).toFixed(2);
+    }
+  }
+  return l;
+}
 
 function _catsToRows(desp, rec) {
   const rows = [CAB_CAT];
@@ -964,11 +1006,7 @@ async function _syncParaSheetsCliente() {
   // Garante que as abas existem antes de tentar escrever
   await _garantirAbas(['💰 Lançamentos', '💳 Cartões', ABA_CAT, ABA_CONTA]);
 
-  const rowsLanc = [CAB_LANC, ...state.lancamentos.map(l => [
-    l.id||'', l.tipo||'', l.descricao||'', l.valor||0, l.categoria||'',
-    l.data||'', l.obs||'', l.pagamento||'',
-    l.recorrente ? 'TRUE' : 'FALSE', l.cartaoId||'', l.contaId||'',
-  ])];
+  const rowsLanc = [CAB_LANC, ...state.lancamentos.map(_lancToRow)];
   const rowsCart = [CAB_CART, ...state.cartoes.map(c => [
     c.id||'', c.nome||'', c.limite||0, c.fechamento||15, c.vencimento||22,
     c.cor||'#2D6A4F', c.corCustom ? 'TRUE' : 'FALSE',
@@ -993,19 +1031,7 @@ async function loadFromSheets() {
     // Lê lançamentos
     const rowsL = await fpSheetsLer('💰 Lançamentos');
     if (rowsL.length > 1) {
-      state.lancamentos = rowsL.slice(1).filter(r => r[0]).map(r => ({
-        id:         String(r[0]||''),
-        tipo:       String(r[1]||''),
-        descricao:  String(r[2]||''),
-        valor:      parseFloat(r[3])||0,
-        categoria:  String(r[4]||''),
-        data:       String(r[5]||''),
-        obs:        String(r[6]||''),
-        pagamento:  String(r[7]||''),
-        recorrente: String(r[8]||'').toUpperCase() === 'TRUE',
-        cartaoId:   String(r[9]||''),
-        contaId:    String(r[10]||''),
-      }));
+      state.lancamentos = rowsL.slice(1).filter(r => r[0]).map(_rowToLanc);
     } else if (rowsL.length === 1) {
       // Só o cabeçalho — planilha ainda vazia: mantém dados locais para não perder lançamentos não sincronizados
       addSyncLog('Planilha de lançamentos vazia — dados locais preservados. Use "Enviar ↑" para subir.', 'warn');
@@ -1620,7 +1646,7 @@ function renderLancamentos() {
           ${l.contaId && getContaById(l.contaId)?`<span class="lanc-badge conta-badge">🏦 ${escHtml(getContaById(l.contaId).nome)}</span>`:''}
           <span>${formatDate(l.data)}</span>
           ${l.recorrente?'<span class="lanc-badge recorrente">🔄 Recorrente</span>':''}
-          ${l.parcelado?`<span class="lanc-badge parcelado">💳 ${l.parcelaAtual}/${l.nParcelas} parcelas</span>`:''}
+          ${l.parcelado?`<span class="lanc-badge parcelado">💳 ${l.parcelaAtual}/${l.nParcelas} · total ${fmt(l.valorTotal||l.valor)}</span>`:''}
           ${l.parcelado&&l.jurosReais>0?`<span class="lanc-badge juros">⚠️ Juros: ${fmt(l.jurosReais)}</span>`:''}
         </div>
       </div>
@@ -1892,6 +1918,14 @@ function saveLancamento() {
   }
   // Dados de parcelamento
   const parcelado = $('fParcelado')?.checked && pag.includes('Crédito');
+  if (parcelado) {
+    const vt = parseFloat($('fValorTotal')?.value) || 0;
+    const np = parseInt($('fParcelas')?.value) || 0;
+    if (!vt || !np || np < 2) {
+      alert('Compra parcelada no cartão:\n\n1. Informe o valor TOTAL da compra\n2. Informe o número de parcelas (mín. 2)\n\nO campo Valor será preenchido automaticamente com o valor de cada parcela.');
+      return;
+    }
+  }
   const parcelInfo = parcelado ? {
     parcelado:    true,
     valorTotal:   parseFloat($('fValorTotal')?.value) || valor,
@@ -2178,6 +2212,7 @@ function renderCartoes() {
         <div class="cartao-limite">Limite: ${fmt(c.limite||0)}</div>
         <div class="cartao-fatura">Fecha dia ${c.fechamento||'—'} · Vence dia ${c.vencimento||'—'}</div>
         <div class="cartao-gasto">${fmt(total)}</div>
+        <div style="font-size:0.68rem;opacity:0.75;margin-top:2px;">Fatura deste mês (parcelas)</div>
         <div class="cartao-bar-track"><div class="cartao-bar-fill" style="width:${pct}%;"></div></div>
         <div class="cartao-footer">
           <span>${pct}% do limite utilizado</span>
